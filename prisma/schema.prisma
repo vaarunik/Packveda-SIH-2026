@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// One completed analysis run (inputs + engine result snapshot)
+model Analysis {
+  id          String   @id @default(cuid())
+  ownerEmail  String   @default("") // Supabase auth email of the owner (server-derived)
+  label       String
+  commodity   String   @default("")
+  inputsJson  String
+  resultJson  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  saved       SavedCandidate[]
+  sources     AnalysisSource[]
+}
+
+// Evidence & Sources — structured citation records attached to an analysis
+// (traceability layer). Rows are derived deterministically from the analysis
+// inputs/result by src/lib/evidence.ts and reference the central registry in
+// src/lib/data/sources.ts. No fabricated sources are ever written here.
+model AnalysisSource {
+  id                String   @id @default(cuid())
+  analysisId        String
+  analysis          Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  sourceType        String   // regulatory | standards | scientific | technical | database | validation
+  sourceName        String   // full authority/publication name
+  title             String   @default("")
+  description       String   @default("")
+  url               String?  // null => source unavailable (never a fabricated link)
+  publicationYear   Int?
+  sourceVersion     String?
+  parameterSupported String  @default("") // comma-separated registry parameters
+  confidenceLevel   String   @default("medium") // high | medium | low
+  parameter         String   @default("") // the claim this row evidences (e.g. "OTR")
+  claim             String   @default("")
+  value             String?  // null => value not available
+  origin            String   @default("source_derived") // source_derived | ai_inferred | user_provided | estimated
+  accessedAt        DateTime @default(now())
+  createdAt         DateTime @default(now())
+}
+
+// A packaging candidate the user saved (candidate for Passport / Trial)
+model SavedCandidate {
+  id           String    @id @default(cuid())
+  ownerEmail   String    @default("") // Supabase auth email of the owner (server-derived)
+  analysisId   String?
+  analysis     Analysis? @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  materialId   String
+  materialName String
+  commodity    String    @default("")
+  score        Float?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  trial        Trial?
+}
+
+// Trial & Validation record — user-entered test data, distinct from AI output
+model Trial {
+  id               String          @id @default(cuid())
+  ownerEmail       String          @default("") // Supabase auth email of the owner (server-derived)
+  savedCandidateId String?         @unique
+  candidate        SavedCandidate? @relation(fields: [savedCandidateId], references: [id], onDelete: SetNull)
+  materialId       String
+  materialName     String
+  commodity        String          @default("")
+  status           String          @default("not_tested") // not_tested | planned | in_progress | validated | rejected
+  dataJson         String          @default("{}")
+  notes            String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Buyer / Seller platform layer
+// ---------------------------------------------------------------------------
+
+// Lightweight prototype identity — role drives the dashboard experience.
+// (Supabase Auth-ready: maps to a `profiles` row keyed by the auth user.)
+model Profile {
+  id        String   @id @default(cuid())
+  role      String // "buyer" (Food Business) | "seller" (Packaging Manufacturer)
+  name      String
+  email     String   @unique
+  company   String   @default("")
+  phone     String   @default("")
+  location  String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// A packaging material listed by a seller/manufacturer.
+// Properties are SELLER-DECLARED and shown with "verification required"
+// provenance — they never overwrite the knowledge-base engine data.
+model SupplierMaterial {
+  id                  String   @id @default(cuid())
+  supplierEmail       String // owner identity (Profile.email, role = seller)
+  companyName         String
+  materialName        String
+  structure           String   @default("")
+  form                String   @default("film_flexible") // film_flexible | laminate_flexible | semi_rigid | rigid | paper_based
+  thicknessMicron     Float?
+  // Barrier values are optional; null => "not provided — verification required"
+  otr                 Float?
+  wvtr                Float?
+  co2tr               Float?
+  otrProvided         Boolean  @default(false)
+  wvtrProvided        Boolean  @default(false)
+  co2trProvided       Boolean  @default(false)
+  tensileStrengthMPa  Float?
+  sealability         String   @default("moderate") // none|low|moderate|high|very_high
+  aromaBarrier        String   @default("low")
+  lightBlocking       String   @default("low")
+  tempMinC            Float?
+  tempMaxC            Float?
+  foodContactSuitable Boolean  @default(true)
+  foodApplications    String   @default("") // comma-separated applications
+  moq                 String   @default("")
+  priceRange          String   @default("")
+  formats             String   @default("")
+  sustainabilityNote  String   @default("")
+  documentsNote       String   @default("")
+  location            String   @default("")
+  contactInfo         String   @default("")
+  status              String   @default("active") // active | paused
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// Sample / Quote requests between a buyer and a seller listing.
+model PackRequest {
+  id                 String   @id @default(cuid())
+  type               String // "sample" | "quote"
+  status             String   @default("pending") // pending | responded | closed
+  buyerEmail         String
+  buyerName          String
+  buyerCompany       String   @default("")
+  supplierEmail      String
+  supplierMaterialId String
+  materialName       String
+  companyName        String
+  commodity          String   @default("")
+  message            String   @default("")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}

@@ -1,0 +1,184 @@
+     1→     1→# PACKVEDA Worklog (Shared)
+     2→     2→
+     3→     3→Project: PACKVEDA — AI-Powered Food Packaging Intelligence (SIH 2026 PS 26236)
+     4→     4→Stack: Next.js 16 App Router, TypeScript, Tailwind 4, shadcn/ui, Framer Motion, Recharts, Prisma/SQLite, Zustand.
+     5→     5→Single visible route `/` (SPA with internal view router). Footer must be sticky (min-h-screen flex flex-col + mt-auto).
+     6→     6→
+     7→     7→IMPORTANT CONTEXT: The uploaded packwise zip never arrived; project is a fresh scaffold. PACKVEDA is being built into it per user's detailed spec. No existing "PackWise" code exists to preserve.
+     8→     8→
+     9→     9→Design system (defined in src/app/globals.css):
+    10→    10→- Palette: deep navy (#0B1F33 family, oklch), forest green primary, emerald accent, soft cream background, subtle blue accents.
+    11→    11→- Custom Tailwind tokens: bg-navy-* (900/800/700), forest, emerald, cream, sand; use via classes like `bg-navy-900`, `text-forest`, `bg-cream`.
+    12→    12→- Fonts: Geist Sans/Mono (existing). Serif display optional via font-serif stack.
+    13→    13→
+    14→    14→Key architecture:
+    15→    15→- src/lib/engine.ts — deterministic recommendation engine (pure, shared types). NO LLM. Server-side via /api/analyze.
+    16→    16→- src/lib/data/commodities.ts — 12 commodities with indicative food-science values + provenance.
+    17→    17→- src/lib/data/materials.ts — 14 packaging materials with OTR/WVTR/CO2TR/strength/temp/cost/sustainability + provenance. Values labelled "indicative literature ranges".
+    18→    18→- src/lib/glossary.ts — term definitions for TermTooltip.
+    19→    19→- src/lib/store.ts — Zustand SPA store: view router, wizard state, results, compare list, simulator.
+    20→    20→- API routes: /api/analyze (POST), /api/analyses (GET/POST/DELETE), /api/saved (GET/POST/DELETE), /api/trials (GET/POST/PATCH/DELETE).
+    21→    21→- Views: home, analyze, results, compare, passport, simulator, dashboard, trials, explorer, sources, about.
+    22→    22→- Shared components: SiteHeader, SiteFooter, TermTooltip, MaturityBadge (available-now/prototype/future), SectionHeading, WorkflowDiagram, ScoreBar.
+    23→    23→
+    24→    24→---
+    25→    25→Task ID: 1-5
+    26→    26→Agent: Z.ai Code (main)
+    27→    27→Task: Foundation — schema, data layer, engine, APIs, app shell
+    28→    28→
+    29→    29→Work Log:
+    30→    30→- Prisma schema (Analysis, SavedCandidate, Trial) pushed to SQLite (db:push OK)
+    31→    31→- src/lib/data/types.ts, commodities.ts (12 commodities), materials.ts (14 materials) with provenance + "indicative value" disclaimers
+    32→    32→- src/lib/glossary.ts — 22 terms for TermTooltip
+    33→    33→- src/lib/engine.ts — deterministic engine: deriveRequirements (food-science rules) → hard-constraint filtering (food contact, temp coverage, breathability OTR>100 for respiring produce) → multi-criteria scoring → explainable matches/gaps/exclusions. Validated on all 5 demo scenarios; results sensible
+    34→    34→- src/lib/store.ts — Zustand SPA store (view router, wizard, results, compare, simulator) + DEMO_SCENARIOS + DEFAULT_INPUT + requireCommodity (all exported)
+    35→    35→- API routes: POST /api/analyze (zod-validated), /api/analyses GET/POST/DELETE, /api/saved GET/POST/DELETE (include trial), /api/trials GET/POST/PATCH/DELETE
+    36→    36→- src/app/globals.css — PACKVEDA palette: navy-950/900/800/700/600, forest-800..50, cream-50..300, sand-400; bg-grid-navy, bg-grid-cream, glass-dark, glass-light, scroll-slim utilities
+    37→    37→- src/app/layout.tsx — PACKVEDA metadata; TooltipProvider global
+    38→    38→- src/app/page.tsx — shell: min-h-screen flex flex-col, skip link, SiteHeader, dynamic view switch, SiteFooter (sticky footer via mt-auto)
+    39→    39→- Shared components in src/components/shared/: term-tooltip (Term, keys below), maturity-badge (MaturityBadge: available|prototype|future), section-heading (SectionHeading), score-ring (ScoreRing, ScoreBar), empty-state (EmptyState), workflow-diagram (RecommendationPipeline, TraditionalFlow), site-header (SiteHeader, Wordmark), site-footer (SiteFooter)
+    40→    40→
+    41→    41→Stage Summary:
+    42→    42→- CONTRACT FOR VIEW AGENTS (all views: 'use client', default export, no props, file = src/components/views/<name>-view.tsx):
+    43→    43→  * Store: usePackVeda → { view, setView, wizardStep, setWizardStep, wizardInput, setWizardInput(partial), applyDemo(id), resetWizard, result, lastLabel, setResult(result,label?), analyzing, setAnalyzing, passportMaterialId, openPassport(id), compareIds, toggleCompare(id), clearCompare, simulating, setSimulating, simResult, setSimResult }
+    44→    44→  * View type: 'home'|'analyze'|'results'|'compare'|'passport'|'simulator'|'dashboard'|'trials'|'explorer'|'sources'|'about'
+    45→    45→  * Engine: import type { AnalysisInput, EngineOutput, CandidateResult, DerivedRequirement, Importance } from '@/lib/engine'; EngineOutput = { requirements, candidates, recommended, weights, engineMeta:{engineVersion, generatedAt, inputsSummary, filtersApplied, disclaimer} }; CandidateResult = { materialId, materialName, score 0-100, status 'recommended'|'viable'|'excluded', rank, breakdown{barrier,shelfLife,mechanical,cost,sustainability,availability 0-1}, matches[], gaps[], exclusionReasons[] }; DerivedRequirement = { key: 'moisture'|'oxygen'|'co2'|'light'|'aroma'|'mechanical'|'seal'|'thermal', label, level: Intensity|'exchange', unitNote?, rationale }
+    46→    46→  * Data: import { MATERIALS, getMaterial } from '@/lib/data/materials'; { COMMODITIES, getCommodity, COMMODITY_CATEGORY_LABELS } from '@/lib/data/commodities'; { Commodity, PackagingMaterial, Intensity, SourceRef } from '@/lib/data/types'. Material numeric props nullable (otr/wvtr/co2tr/tensile/tempMin/tempMax) → show 'Data not available' when null. otrSourceAvailable/wvtrSourceAvailable/co2trSourceAvailable booleans for provenance badges
+    47→    47→  * APIs: POST /api/analyze with AnalysisInput → returns EngineOutput+disclaimer | {error}; GET/POST/DELETE /api/analyses ({label,commodity,inputsJson,resultJson}); GET/POST/DELETE /api/saved ({analysisId?,materialId,materialName,commodity?,score?,notes?}, include:trial); GET/POST/PATCH/DELETE /api/trials ({savedCandidateId?,materialId,materialName,commodity?,status?,data?}, status: not_tested|planned|in_progress|validated|rejected)
+    48→    48→  * Shared UI: Term (glossary keys: OTR, WVTR, CO2TR, waterActivity, barrier, sealability, tensileStrength, respiration, map, rh, hygroscopic, rancidity, chillingInjury, freezeBurn, micron, foodContactGrade, datasheet, metallizedFilm, evoh, compostable, shelfLife, wvtrCondition), MaturityBadge status='available'|'prototype'|'future', SectionHeading (eyebrow,title,description,align,dark), ScoreRing {value}, ScoreBar {label,value 0-1,tooltipKey?}, EmptyState {icon,title,description,actionLabel?,onAction?}, RecommendationPipeline, TraditionalFlow
+    49→    49→  * Palette: bg-navy-950/900/800, text-cream-50/100, bg-forest-700 hover:bg-forest-600 (primary buttons), bg-cream-50/100/200 surfaces, emerald-400 accents on dark. NO indigo/blue. Cards: shadcn Card + subtle border. Dark sections: bg-navy-950 + bg-grid-navy
+    50→    50→  * Recharts for radar/bar charts. Framer Motion subtle (whileInView fade/translate). lucide-react icons. NEVER modify shared files; never add own footer; never call LLM; show 'Data not available' where null; honest maturity badges
+    51→    51→
+    52→    52→---
+    53→    53→Task ID: 6-a
+    54→    54→Agent: frontend-view-builder-a
+    55→    55→Task: Build home-view.tsx (judge-facing landing page), about-view.tsx, sources-view.tsx (data & sources transparency page)
+    56→    56→
+    57→    57→Work Log:
+    58→    58→- Read worklog CONTRACT + verified APIs against src/lib/store.ts, src/lib/engine.ts (types), src/lib/data/types.ts, shared components (Term, MaturityBadge, SectionHeading, RecommendationPipeline, TraditionalFlow), glossary keys and globals.css palette tokens before writing any code
+    59→    59→- src/components/views/home-view.tsx — full landing page, 8 sections, all 'use client', default export, no props:
+    60→    60→  1) HERO on bg-navy-950 + bg-grid-navy with radial emerald glow blurs: SIH 2026 · PS 26236 outline chip (emerald), huge PACKVEDA H1 with emerald→sand gradient span, subtitle, tagline (emerald-400), description, CTAs (Start Packaging Analysis → setView('analyze') with bg-forest-600 hover:bg-forest-500; Explore How It Works smooth-scrolls to #how-it-works), ShieldCheck trust statement ("Not laboratory-validated output"), <RecommendationPipeline /> on the right
+    61→    61→  2) WHY PACKAGING SELECTION IS STILL DIFFICULT (cream-100): 11 factor chips with lucide icons, Term tooltips on waterActivity/respiration/shelfLife/rh; "traditional workflow today" card with <TraditionalFlow /> + ArrowDown + forest callout ("PackVeda simplifies this workflow...")
+    62→    62→  3) HOW PACKVEDA WORKS (id="how-it-works", white): 6 numbered step cards (01-06, md:2/xl:3 cols) with descriptions + bullet lists; step 03 has MaturityBadge available + "derived from food + environment — not arbitrary AI guesses" callout; step 05 shows WHY RECOMMENDED (forest) vs WHY ALTERNATIVES WERE NOT SELECTED (amber) mini-panels; step 06 has "Recommendation ≠ Final Approval" callout with AI recommends → Testing validates → Expert approves + 8 validation-stage chips
+    63→    63→  4) INSIDE THE ENGINE (dark navy): 9-node numbered pipeline (User Inputs → … → Explainable Recommendation highlighted emerald) with framer-motion stagger, 2-col compact grid; right "Not just an LLM" card with 7 numbered intelligence layers, "The LLM never invents OTR/WVTR values or scientific facts" callout, MaturityBadge available "Deterministic core" + MaturityBadge future "Optional LLM explanation layer" (dark-variant override via className)
+    64→    64→  5) WHO IS PACKVEDA FOR (cream): Farmers/MSMEs/Manufacturers/Food Technologists cards (Sprout, Building2, Factory, Microscope)
+    65→    65→  6) WHY PACKVEDA MATTERS (white): 4 pillars (Wheat, ClipboardCheck, Store, Recycle) + honest small print about no claimed percentages
+    66→    66→  7) AI ≠ MAGIC (forest-50 band): explainability statement + 3 mini-cards (Explainable logic / Honest data "Data not available" / Validation-first)
+    67→    67→  8) FINAL CTA (dark navy): "From food characteristics to the right packaging — intelligently." + Start Packaging Analysis + View Dashboard (setView('dashboard'))
+    68→    68→- src/components/views/about-view.tsx — mission paragraphs, "The Problem We Address" card quoting official PS 26236 title in a blockquote, "Our Approach" 4 icon bullets (rules+data+explainability, no LLM fabrication, validation-first, honest data), custom Feature Maturity table (10 rows × MaturityBadge: 6 available, 2 prototype, 2 future), forest-50 "Designed for Explainable Decisions" quote card, Contact & Feedback card with MaturityBadge future "Coming Soon", SIH 2026 PS 26236 footer note
+    69→    69→- src/components/views/sources-view.tsx — header + provenance intro + context chips; 4 "how PackVeda handles data" cards (indicative literature values with Term wvtrCondition, provenance per property with Term datasheet, no-fabrication policy, verification required); Property Availability table with 7 rows (OTR/WVTR/CO₂TR/tensile/temp/cost/sustainability) whose counts are COMPUTED at runtime from MATERIALS (filter on *SourceAvailable flags / null checks) with status pills: Source available (forest CheckCircle2) / Partially available (amber AlertCircle) / Data not available (gray Minus); Reference list card (USDA FCS reference_database, FAO + film-property + spice/coffee/dairy literature textbook) with kind chips; dataset version card "PackVeda knowledge base v1.0 (prototype dataset, compiled 2026)"; per-material provenance Accordion (14 items, max-h + scroll-slim): name/family, provenance dots on trigger, OTR/WVTR/CO₂TR source badges, indicative value line with "—" fallback, SourceRef list with kind chips + notes, dataConfidenceNote; CTA card → setView('explorer') with bg-forest-700 primary button
+    70→    70→- Design compliance: no file outside the 3 targets modified; rounded-xl max + subtle shadows + 1px borders; NO indigo/blue/purple/pink (navy/forest/emerald/cream/sand + amber only where honest-status badges need it); Framer Motion whileInView once:true throughout; semantic sections with aria-labelledby/aria-label, sr-only captions, keyboard-accessible controls; Term tooltips only on light surfaces (they use light-theme muted colors); responsive mobile-first (grid stacking, flex-wrap CTAs, min-w table + overflow-x-auto)
+    71→    71→
+    72→    72→Stage Summary:
+    73→    73→- All 3 view files follow the CONTRACT exactly ('use client', default export, no props, store API via usePackVeda, palette tokens from globals.css). Home hero CTA wires setView('analyze'); final CTA also exposes setView('dashboard'); sources CTA wires setView('explorer'). Sources page derives availability counts from MATERIALS at runtime so the table stays correct if the dataset changes. No shared file, route, API, or store changes were made.
+    74→    74→
+    75→    75→---
+    76→    76→Task ID: 6-d
+    77→    77→Agent: frontend-view-builder-d
+    78→    78→Task: Dashboard, Trials & Validation, Data Explorer views
+    79→    79→
+    80→    80→Work Log:
+    81→    81→- Created src/components/views/dashboard-view.tsx (790 lines, 'use client', default export, no props):
+    82→    82→  * Parallel fetch GET /api/analyses + /api/saved + /api/trials via Promise.allSettled on mount; per-endpoint graceful degradation (empty array + one error toast); refreshAll on demand
+    83→    83→  * Header + "Start New Analysis" (bg-forest-700); 4 stat cards (FileSearch/Bookmark/FlaskConical/BadgeCheck) with Skeleton loading
+    84→    84→  * Recent Analyses card: label/commodity/en-IN date/engineVersion (parsed from resultJson → engineMeta.engineVersion); "Open results" → setResult(parsed,label)+setView('results'); Delete → DELETE /api/analyses?id=; EmptyState; list max-h-96 overflow-y-auto scroll-slim
+    85→    85→  * Saved Candidates card: score badge, trial status badge (from included trial), "Passport" → openPassport(materialId), "Start Trial" → POST /api/trials {savedCandidateId,materialId,materialName,commodity,status:'planned'} → refresh trials, Delete → DELETE /api/saved?id=
+    86→    86→  * Validation Status summary: per-status count badges (5 statuses) + mini trial list (updatedAt) + "Go to Trials"
+    87→    87→  * Demo Scenarios card (id="demo-scenarios"): renders the exact 5 DEMO_SCENARIOS imported from store (rice/tomato/mango/chilli/groundnut), "Run scenario" → applyDemo(id); MaturityBadge available
+    88→    88→  * What-if mini-card (dark navy, bg-grid-navy) → setView('simulator'); Comparison mini-card shows compareIds.length → setView('compare'); reset-wizard helper button
+    89→    89→- Created src/components/views/trials-view.tsx (965 lines): canonical owner of TrialStatusBadge + TRIAL_STATUSES/TRIAL_STATUS_LABELS/TRIAL_STATUS_BADGE (exported; dashboard imports from here — one-directional, no cycle)
+    90→    90→  * Data-integrity Alert banner (amber): "stores user-entered test results. PackVeda never generates or simulates test outcomes..." + MaturityBadge prototype
+    91→    91→  * Static 6-step workflow stepper (Recommended Candidate → … → Validation Status), horizontal scroll on mobile (overflow-x-auto scroll-slim), last step forest-filled with BadgeCheck
+    92→    92→  * "New Trial" Dialog: material Select from saved candidates if any else MATERIALS (values saved:<id>/mat:<id>), commodity Input prefilled from wizardInput.commodityName, initial-status Select (default planned), notes Textarea; POST /api/trials → refresh; NO test values in creation form
+    93→    93→  * Trial cards with Accordion expand: 9-field user-entered test form (OTR cc/m²/day, WVTR g/m²/day, Seal N/15mm, Compression kPa/N, Weight loss %, Moisture change %, Oxidation, Microbial, Shelf-life observation) bound to per-card draft state (card keyed id:updatedAt for remount); Save → PATCH /api/trials {id,data,notes} → toast "Saved as user-entered result"
+    94→    94→  * Status Select (5 statuses; not_tested=gray-navy, planned=cream/navy outline, in_progress=amber, validated=forest filled, rejected=destructive) + helper "Only mark 'Validated' after documented testing." → PATCH
+    95→    95→  * Compare block when result.recommended.materialId === trial.materialId: side-by-side "AI recommendation (indicative)" (getMaterial OTR/WVTR or 'Data not available') vs "User-entered test result" (or 'Not recorded') + "differences are expected" note
+    96→    96→  * Reminder chip per trial "User-entered test result ≠ AI recommendation"; Passport shortcut (openPassport); Delete trial; EmptyState FlaskConical with CTA
+    97→    97→- Created src/components/views/explorer-view.tsx (781 lines): static knowledge-base explorer, no fetch
+    98→    98→  * Tabs Commodities (12) | Packaging Materials (14) with counts
+    99→    99→  * Commodities: search by name/description + category Select (All + 9 COMMODITY_CATEGORY_LABELS); cards: category+processing badges, Moisture/Fat/pH/waterActivity (Term) or 'Data not available', respiration (Term), O₂/aroma/light sensitivity (INTENSITY_LABEL), Hygroscopic/Fragile/Chilling-sensitive chips, typical storage "X °C · Y% RH · Z days", notes bullets, SourceRef footer with kind badges
+   100→   100→  * Materials: search + family Select (unique families); cards: family+form badges, OTR/WVTR/CO₂TR rows with Term tooltips + provenance dot (green bg-forest-500 = source available, muted = no verified value; uses otrSourceAvailable etc.) or 'Data not available', tensile/N-A, thickness (Term micron), sealability/puncture (Term), temp range, food contact note, cost category + relativeCostIndex 1-5 dots, sustainability score+recyclable label, applications chips, limitations list, regulatoryNotes, dataConfidenceNote italic, sources
+   101→   101→  * Footer card: "All values are indicative literature-typical values for decision support — verify with supplier datasheets (Term k='datasheet')" + "View Sources" → setView('sources')
+   102→   102→- Compliance: shadcn/ui only; palette navy/forest/cream/amber (NO indigo/blue/purple); framer-motion subtle fades; relative '/api/...' paths only; '@/hooks/use-toast' feedback; EmptyState/Skeleton/MaturityBadge/Term reused; responsive grids (2-col mobile → 4-col stats, 3-col explorer xl); no existing files modified
+   103→   103→- Verification: tsc --noEmit → 0 errors in all 3 files (remaining project errors belong to other agents' in-progress files)
+   104→   104→
+   105→   105→Stage Summary:
+   106→   106→- Dashboard, Trials and Explorer views are ready and contract-compliant. Trials module is the canonical source for trial-status badge config (exported from trials-view.tsx). API expectations: /api/analyses GET rows {id,label,commodity,inputsJson,resultJson,createdAt}; /api/saved GET include:trial; /api/trials GET/POST/PATCH/DELETE with dataJson round-trip. Views pending from other agents: analyze, results, simulator (page.tsx imports still unresolved at time of writing).
+   107→   107→
+   108→   108→---
+   109→   109→Task ID: 6-b
+   110→   110→Agent: frontend-view-builder-b
+   111→   111→Task: Core analysis flow — analyze-view (6-step wizard) + results-view (intelligence results)
+   112→   112→
+   113→   113→Work Log:
+   114→   114→- src/components/views/analyze-view.tsx (NEW, 'use client', default export, no props):
+   115→   115→  * Header (title "Packaging Analysis" / subtitle "Decision support in six guided steps" / Reset) + 6 clickable segment pills (01 Food…06 Analysis; active=forest-700 filled, completed=forest-100+Check, upcoming=cream-200) + thin progress bar.
+   116→   116→  * Step 1: DEMO_SCENARIOS chips (applyDemo + "Scenario loaded" toast), commodity Select grouped by COMMODITY_CATEGORY_LABELS + "custom" option; KB selection auto-fills via requireCommodity + info Alert + commodity notes + source chips; custom mode = name input + 9-category Select + fresh/processed RadioGroup.
+   117→   117→  * Step 2: moisture/fat sliders+% inputs, pH 0-14, optional water activity (checkbox ↔ null + "Data not available"), respiration Select (disabled+Tooltip→'none' when processed), oxygen/aroma/light sensitivity selects (Term: rancidity, waterActivity, respiration, hygroscopic), hygroscopic/fragile Switches.
+   118→   118→  * Step 3: shelf-life input + presets 7/30/90/180/270/365, temp slider −30..45 °C, RH 10..95%, storage-type Select, chilling-injury amber Alert (chillingSensitive && temp < minSafe, Term chillingInjury), frozen → freezer-burn note (Term freezeBurn).
+   119→   119→  * Step 4: transport days 0-60 + presets 1/3/7/14/30, mode Select, handling + light-exposure RadioGroups.
+   120→   120→  * Step 5: 5 priority rows (IMPORTANCE_LABEL) + normalisation note.
+   121→   121→  * Step 6: full input review grid ("Data not available" for null aw) + Run Analysis → POST /api/analyze → setResult(label `commodity · dd MMM yyyy en-IN`) → setView('results'); errors: destructive toast + inline Retry; analyzing overlay w/ Loader2 + 4 rotating status lines @700ms. Per-step validation blocks Continue (custom name/category, shelf ≥ 1).
+   122→   122→- src/components/views/results-view.tsx (NEW, 'use client', default export, no props):
+   123→   123→  * EmptyState (ScanSearch → analyze) when !result.
+   124→   124→  * Header card: lastLabel, commodity, MaturityBadge "Deterministic engine", engineVersion, generated time, disclaimer Alert; buttons New Analysis / Scenario Simulation / Save Analysis (POST /api/analyses, saving/saved states).
+   125→   125→  * Derived Packaging Requirements grid — level badges (very_high|high=forest-700 filled, moderate=forest-100, low=cream-200, exchange=amber) + rationales + "not arbitrary AI guesses" note.
+   126→   126→  * Top candidate card: name/family/structure + ScoreRing "Overall Compatibility" + honesty caption; 4 sub-cards (Barrier: OTR/WVTR/CO₂TR ≈ values or "Data not available" + source-available/no-verified-value provenance badges; Physical: tensile/thickness µm/sealability+sealNote; Compatibility: temp range −X °C fmt + storage match note, food contact + note, storage suitability; Business: cost dots 1-5 + category, sustainability % + recyclable, availability) via getMaterial().
+   127→   127→  * Why PackVeda Recommended This (forest-50, CheckCircle2) + Potential Limitations (amber-50, TriangleAlert; gaps + 3 standard validation caveats).
+   128→   128→  * Why Alternatives Were Not Selected: Accordion per other candidate (score + status badges; exclusionReasons w/ red X or gaps w/ amber icons; matches preview; Add to Compare + View Passport).
+   129→   129→  * Ranked Candidates table (viable, by rank; sticky header, max-h-96 scroll-slim): Material | Score | Barrier fit | Cost dots | Sustainability mini-bar + Compare/Passport actions.
+   130→   130→  * Sticky bottom action bar: Add top to Compare, n/4 counter, Go to Compare, View Passport, Save Candidate (POST /api/saved), Start Trial (POST /api/trials status 'planned' → view trials). Local state: expandedCandidateId + saving/saved flags; all errors → destructive toasts; zero prop-drilling beyond store contract.
+   131→   131→- Verified: `bunx tsc --noEmit` → 0 errors in both new files (remaining tsc errors are pre-existing in engine.ts/examples/skills — untouched per contract). No existing file modified.
+   132→   132→
+   133→   133→Stage Summary:
+   134→   134→- analyze-view + results-view implement the full core analysis loop and honour the view contract (store API, shared components, palette, honest "Data not available" labels, no indigo/blue).
+   135→   135→- API response note for later agents: POST /api/analyze returns EngineOutput fields at top level plus top-level `disclaimer` (engineMeta.disclaimer also present) — results-view reads engineMeta.disclaimer only.
+   136→   136→
+   137→   137→---
+   138→   138→Task ID: 6-c
+   139→   139→Agent: frontend-view-builder-c
+   140→   140→Task: Comparison & decision modules — compare-view, passport-view, simulator-view
+   141→   141→
+   142→   142→Work Log:
+   143→   143→- src/components/views/compare-view.tsx — Material Comparison (2–4 materials):
+   144→   144→  * Empty state (GitCompareArrows) with quick-add grid of all 14 MATERIALS (disabled at 4) + "Add from your analysis" chips (top-5 non-excluded candidates) when a result exists; action → explorer view
+   145→   145→  * Recharts RadarChart (ResponsiveContainer h-340), 6 normalized 0–100 axes (Oxygen/Moisture barrier via 100-(log10(v+1)/4)*100 inverted, strength min(100,MPa), sealability none..very_high→0..100, cost (6-idx)*20, sustainability*100); one Radar per material, palette forest-600/navy-700/chart-3/sand-400, fillOpacity 0.15, custom accessible legend
+   146→   146→  * Property table (scroll-x wrapper + scroll-slim, inner table-container forced overflow-visible): OTR/WVTR/CO₂TR (Term tooltips), tensile, thickness, sealability, puncture, temp range, food contact, relative cost (index+dots), sustainability (score+recyclable), availability, data confidence; "≈ X" numbers, "Data not available" for nulls; best-value cells highlighted bg-forest-50 + Check (OTR/WVTR/CO₂TR/cost lower-better, tensile/sustainability higher-better, ≥2 non-null values required)
+   147→   147→  * Per-column header actions: Passport (openPassport) + Remove (toggleCompare); amber provenance note card with Term k="datasheet" + MaturityBadge available
+   148→   148→  * "Recommendation context" section when result exists: per-material status badge (recommended/viable/excluded), rank, engine score /100
+   149→   149→- src/components/views/passport-view.tsx — Packaging Passport:
+   150→   150→  * Material Select synced to openPassport; picker grid of all materials when passportMaterialId null; detail "structured document" otherwise
+   151→   151→  * Header band bg-navy-950/bg-grid-navy: name/family/structure/form label, MaturityBadge prototype "Packaging Passport — Prototype module", deterministic Concept ID chip PKV-{ID-UPPER}-{yyMMdd}
+   152→   152→  * 2-col section grid: Key Barrier Properties (OTR/WVTR/CO₂TR + units + provenance badges "source available"/"No verified value available" from *SourceAvailable flags), Mechanical (tensile "Not applicable" for rigid/semi-rigid nulls, thickness Term micron, puncture, sealability+sealNote), Food Compatibility, Temperature Suitability, Recommended Applications chips, Limitations (TriangleAlert amber), Sustainability (ScoreBar+recyclable+notes), Regulatory & Compliance (+Alert: verification required, no compliance claims, no invented certifications), Data Sources (SourceRef kind badges + dataConfidenceNote italic), Validation Requirements (static unchecked checklist ×7 + "AI recommends → Testing validates → Expert approves" flow)
+   153→   153→  * QR Traceability concept card (MaturityBadge future "Planned / Future Integration"): PACKVEDA PACKAGING ID record (Material, Food Application "to be linked", Batch/Version v1.0-prototype, Recommendation Date today, Validation Status "Not linked in prototype", Source/Data Version PackVeda KB v1.0) + decorative deterministic 21×21 fake-QR SVG (FNV-1a hash + mulberry32, corner finder markers) labelled "Not a scannable code" — no blockchain claims
+   154→   154→- src/components/views/simulator-view.tsx — Scenario Simulation (What-If):
+   155→   155→  * Header + MaturityBadge available "Uses the live engine"; EmptyState (SlidersHorizontal) "Run an analysis first" → analyze + DEMO_SCENARIOS quick-start chips (applyDemo)
+   156→   156→  * Controls card: temp slider −30..45, RH slider 10..95, shelf-life number+chips (7/30/90/180/365, clamp 1..1825), cost/sustainability/barrier priority Selects (IMPORTANCE_LABEL); every control shows "Base: X"; "Reset to base values"; controls re-sync on wizardInput change
+   157→   157→  * Run Simulation → POST /api/analyze with {...wizardInput, storageTempC, storageRH, targetShelfLifeDays, priorities:{...base, cost, sustainability, barrier}} → setSimResult; spinner button + blur loading overlay; inline error handling (no toast dependency)
+   158→   158→  * Results diff: Base vs Scenario top-5 lists (rank, name, score) with ArrowUpRight forest / ArrowDownRight amber / Minus neutral / "New" (forest) / "Dropped" (muted) badges; Alert "Top recommendation changed: X → Y" vs "Top recommendation unchanged"; Requirements diff chips for moisture & oxygen (e.g. high → very_high, "(unchanged)" when same); single-list fallback when no base result; deterministic-engine disclaimer footer
+   159→   159→- Verified: `tsc --noEmit` — zero errors in the three new files (pre-existing engine.ts type issues untouched, owned by 1-5). No existing files modified. 'use client' + default export + no props in all three.
+   160→   160→
+   161→   161→Stage Summary:
+   162→   162→- compare-view: radar + best-highlighted property table + engine context; passport-view: honest structured passport + QR concept; simulator-view: live-engine what-if re-run with rank/requirements diff. All palette-compliant (navy/forest/cream/sand/amber only), responsive, Framer Motion subtle fades, "Data not available" for all nulls, no fake certifications/suppliers/blockchain.
+   163→   163→
+   164→   164→---
+   165→   165→Task ID: 7-8
+   166→   166→Agent: Z.ai Code (main)
+   167→   167→Task: Integration, fixes, and end-to-end browser verification
+   168→   168→
+   169→   169→Work Log:
+   170→   170→- Fixed engine.ts type errors (Commodity/PackagingMaterial imports from types.ts; oxygen level union type with "exchange")
+   171→   171→- Verified all 4 API routes via curl (analyze/analyses/saved/trials GET POST PATCH DELETE all 200/201)
+   172→   172→- Cleaned test records from DB after API verification
+   173→   173→- Browser verification (agent-browser): home hero + all landing sections render; full wizard walk-through with 3 demo scenarios (chilli, mango, rice) → run analysis → explainable results (ScoreRing 83, barrier/physical/compatibility/business panels, Why Recommended ✓ list, Why Alternatives Not Selected accordion, ranked table); fresh produce correctly shows O2/CO2 "Gas Exchange" requirements
+   174→   174→- FIXED compare-view UX gap: "Add materials" was a dead-end link to explorer → replaced with inline Dialog picker (up to 4 materials, excludes already-selected)
+   175→   175→- Verified compare radar (2 materials), passport (Concept ID PKV-MPET-PE-LAMINATE-260929, QR concept honestly labelled "Not a scannable code", provenance badges, validation checklist), simulator (365-day mango scenario flips top pick with live engine re-run + rank diff arrows)
+   176→   176→- Verified trials (data-integrity banner, creation toast, user-entered form fields, workflow stepper), dashboard (stats + saved analysis round-trip via Open results + demo scenarios grid), explorer (12 commodities / 14 materials with provenance), sources (live property-availability counts), about
+   177→   177→- Verified persistence: Save Analysis → dashboard shows record → reopen restores full result
+   178→   178→- Verified sticky footer (min-h-screen flex flex-col + mt-auto; bounding-rect checks), mobile 390px responsive + hamburger sheet menu
+   179→   179→- FIXED trials banner text-wrap artifact (strong rendered block); FIXED header Sheet aria-describedby warning (added sr-only SheetDescription); FIXED uncontrolled→controlled Select warnings in analyze-view (removed `|| undefined` on value)
+   180→   180→- Final: bunx tsc --noEmit clean for all app code, bun run lint clean, browser console clean (0 warnings/errors), dev.log clean
+   181→   181→
+   182→   182→Stage Summary:
+   183→   183→- PACKVEDA is complete and browser-verified end to end. All 11 views functional on the single / route; deterministic engine drives analysis, comparison context, and scenario simulation; persistence works (analyses/saved/trials); honest data posture enforced throughout ("Data not available", indicative-value disclaimers, Available Now / Prototype / Future Integration badges)
+   184→   184→

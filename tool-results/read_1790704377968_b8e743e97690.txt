@@ -1,0 +1,1185 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import type { ReactNode } from "react";
+     4→     4→import Image from "next/image";
+     5→     5→import { motion } from "framer-motion";
+     6→     6→import {
+     7→     7→  ArrowDown,
+     8→     8→  ArrowRight,
+     9→     9→  Award,
+    10→    10→  BarChart3,
+    11→    11→  Beaker,
+    12→    12→  Boxes,
+    13→    13→  BrainCircuit,
+    14→    14→  Building2,
+    15→    15→  CalendarClock,
+    16→    16→  CheckCircle2,
+    17→    17→  ClipboardCheck,
+    18→    18→  CloudDrizzle,
+    19→    19→  Database,
+    20→    20→  Droplets,
+    21→    21→  Factory,
+    22→    22→  FlaskConical,
+    23→    23→  Layers,
+    24→    24→  Leaf,
+    25→    25→  Microscope,
+    26→    26→  Sparkles,
+    27→    27→  Recycle,
+    28→    28→  SearchCheck,
+    29→    29→  ShieldAlert,
+    30→    30→  ShieldCheck,
+    31→    31→  Sprout,
+    32→    32→  Store,
+    33→    33→  Thermometer,
+    34→    34→  Trash2,
+    35→    35→  TriangleAlert,
+    36→    36→  Truck,
+    37→    37→  Waves,
+    38→    38→  Wheat,
+    39→    39→  Wind,
+    40→    40→} from "lucide-react";
+    41→    41→import { Button } from "@/components/ui/button";
+    42→    42→import { MaturityBadge } from "@/components/shared/maturity-badge";
+    43→    43→import { SectionHeading } from "@/components/shared/section-heading";
+    44→    44→import { Term } from "@/components/shared/term-tooltip";
+    45→    45→import {
+    46→    46→  RecommendationPipeline,
+    47→    47→  TraditionalFlow,
+    48→    48→  EcosystemPillars,
+    49→    49→} from "@/components/shared/workflow-diagram";
+    50→    50→import { usePackVeda } from "@/lib/store";
+    51→    51→import type { GlossaryKey } from "@/lib/glossary";
+    52→    52→
+    53→    53→// ---------------------------------------------------------------------------
+    54→    54→// Shared motion preset — subtle reveal, fires once
+    55→    55→// ---------------------------------------------------------------------------
+    56→    56→
+    57→    57→const fadeUp = {
+    58→    58→  initial: { opacity: 0, y: 18 },
+    59→    59→  whileInView: { opacity: 1, y: 0 },
+    60→    60→  viewport: { once: true, margin: "-60px" },
+    61→    61→} as const;
+    62→    62→
+    63→    63→// ---------------------------------------------------------------------------
+    64→    64→// Section 2 data — 11 factors that make packaging selection difficult
+    65→    65→// ---------------------------------------------------------------------------
+    66→    66→
+    67→    67→interface Factor {
+    68→    68→  icon: React.ElementType;
+    69→    69→  label: string;
+    70→    70→  termKey?: GlossaryKey;
+    71→    71→}
+    72→    72→
+    73→    73→const FACTORS: Factor[] = [
+    74→    74→  { icon: Droplets, label: "Moisture content" },
+    75→    75→  { icon: Beaker, label: "Fat / oil content" },
+    76→    76→  { icon: FlaskConical, label: "Acidity (pH)" },
+    77→    77→  { icon: Waves, label: "Water Activity", termKey: "waterActivity" },
+    78→    78→  { icon: Leaf, label: "Respiration", termKey: "respiration" },
+    79→    79→  { icon: Wind, label: "Oxygen sensitivity" },
+    80→    80→  { icon: CalendarClock, label: "Desired Shelf Life", termKey: "shelfLife" },
+    81→    81→  { icon: Thermometer, label: "Storage temperature" },
+    82→    82→  { icon: CloudDrizzle, label: "Relative Humidity", termKey: "rh" },
+    83→    83→  { icon: Truck, label: "Transportation conditions" },
+    84→    84→  { icon: Boxes, label: "Mechanical protection" },
+    85→    85→];
+    86→    86→
+    87→    87→// ---------------------------------------------------------------------------
+    88→    88→// Section 3 data — 6-step "How PackVeda works"
+    89→    89→// ---------------------------------------------------------------------------
+    90→    90→
+    91→    91→interface StepDef {
+    92→    92→  num: string;
+    93→    93→  title: string;
+    94→    94→  desc: string;
+    95→    95→  bullets?: string[];
+    96→    96→  extra?: ReactNode;
+    97→    97→}
+    98→    98→
+    99→    99→const REQUIREMENT_CALLOUT: ReactNode = (
+   100→   100→  <div className="mt-4 rounded-lg border border-forest-600/25 bg-forest-50 p-3">
+   101→   101→    <MaturityBadge status="available" />
+   102→   102→    <p className="mt-2 text-[13px] font-medium leading-relaxed text-forest-800">
+   103→   103→      Requirements are derived from food + environment — not arbitrary AI
+   104→   104→      guesses.
+   105→   105→    </p>
+   106→   106→  </div>
+   107→   107→);
+   108→   108→
+   109→   109→const VALIDATION_STAGES = [
+   110→   110→  "Material verification",
+   111→   111→  "Seal integrity testing",
+   112→   112→  "OTR / WVTR testing",
+   113→   113→  "Strength testing",
+   114→   114→  "Storage trial",
+   115→   115→  "Shelf-life study",
+   116→   116→  "Microbiological validation (where applicable)",
+   117→   117→  "Expert / lab verification",
+   118→   118→];
+   119→   119→
+   120→   120→const VALIDATION_CALLOUT: ReactNode = (
+   121→   121→  <div className="mt-4 rounded-xl border border-navy-950/10 bg-cream-100 p-4">
+   122→   122→    <p className="text-sm font-bold text-navy-950">
+   123→   123→      Recommendation ≠ Final Approval
+   124→   124→    </p>
+   125→   125→    <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[13px] font-semibold text-forest-700">
+   126→   126→      AI recommends
+   127→   127→      <ArrowRight className="size-3.5" aria-hidden />
+   128→   128→      <span className="text-navy-800">Testing validates</span>
+   129→   129→      <ArrowRight className="size-3.5" aria-hidden />
+   130→   130→      Expert approves
+   131→   131→    </p>
+   132→   132→    <div className="mt-3 flex flex-wrap gap-1.5">
+   133→   133→      {VALIDATION_STAGES.map((stage) => (
+   134→   134→        <span
+   135→   135→          key={stage}
+   136→   136→          className="rounded-full border border-forest-600/25 bg-forest-50 px-2.5 py-1 text-[11px] font-medium text-forest-800"
+   137→   137→        >
+   138→   138→          {stage}
+   139→   139→        </span>
+   140→   140→      ))}
+   141→   141→    </div>
+   142→   142→  </div>
+   143→   143→);
+   144→   144→
+   145→   145→const STEPS: StepDef[] = [
+   146→   146→  {
+   147→   147→    num: "01",
+   148→   148→    title: "Define the Food",
+   149→   149→    desc: "Tell PackVeda what you are packing: the commodity, its category and whether it is fresh or processed. Composition inputs set the scientific baseline for every requirement that follows.",
+   150→   150→    bullets: [
+   151→   151→      "Commodity & category selection",
+   152→   152→      "Moisture, fat/oil content and pH",
+   153→   153→      "Water activity where available",
+   154→   154→      "Respiration rate for fresh produce",
+   155→   155→    ],
+   156→   156→  },
+   157→   157→  {
+   158→   158→    num: "02",
+   159→   159→    title: "Define Storage Conditions",
+   160→   160→    desc: "Describe where the packed food will live and how it will travel — because the same food can demand very different packaging on a shelf, in a cold chain or in a freezer.",
+   161→   161→    bullets: [
+   162→   162→      "Target shelf life in days",
+   163→   163→      "Storage temperature & relative humidity",
+   164→   164→      "Ambient, chilled, frozen or cold chain",
+   165→   165→      "Transport duration, mode & light exposure",
+   166→   166→    ],
+   167→   167→  },
+   168→   168→  {
+   169→   169→    num: "03",
+   170→   170→    title: "Determine Packaging Requirements",
+   171→   171→    desc: "The engine converts food science into packaging language: eight requirement dimensions, each with an intensity level and a written rationale you can read and challenge.",
+   172→   172→    bullets: [
+   173→   173→      "Moisture & oxygen barrier levels",
+   174→   174→      "CO₂ management for respiring produce",
+   175→   175→      "Light, aroma & mechanical protection",
+   176→   176→      "Sealability & thermal resistance",
+   177→   177→    ],
+   178→   178→    extra: REQUIREMENT_CALLOUT,
+   179→   179→  },
+   180→   180→  {
+   181→   181→    num: "04",
+   182→   182→    title: "Evaluate Packaging Materials",
+   183→   183→    desc: "Each candidate material in the knowledge base is checked against your requirements using indicative property data with documented provenance — never invented values.",
+   184→   184→    bullets: [
+   185→   185→      "OTR, WVTR & CO₂TR transmission rates",
+   186→   186→      "Thickness & tensile strength",
+   187→   187→      "Sealability & temperature suitability",
+   188→   188→      "Food-contact suitability, relative cost & sustainability",
+   189→   189→    ],
+   190→   190→  },
+   191→   191→  {
+   192→   192→    num: "05",
+   193→   193→    title: "Generate Explainable Recommendations",
+   194→   194→    desc: "You receive a ranked shortlist — not a black box. Every score is broken down, and the output states both sides of the decision: why the winner won, and why the rest did not.",
+   195→   195→    extra: (
+   196→   196→      <div className="mt-4 space-y-2.5">
+   197→   197→        <div className="rounded-lg border border-forest-600/25 bg-forest-50 p-3">
+   198→   198→          <p className="text-[11px] font-semibold uppercase tracking-wider text-forest-700">
+   199→   199→            Why recommended
+   200→   200→          </p>
+   201→   201→          <p className="mt-1 text-[13px] leading-relaxed text-navy-700">
+   202→   202→            Meets oxygen barrier · Suitable for moisture sensitivity ·
+   203→   203→            Compatible with storage · Meets shelf-life target · Fits your
+   204→   204→            priorities
+   205→   205→          </p>
+   206→   206→        </div>
+   207→   207→        <div className="rounded-lg border border-amber-600/25 bg-amber-50 p-3">
+   208→   208→          <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-800">
+   209→   209→            Why alternatives were not selected
+   210→   210→          </p>
+   211→   211→          <p className="mt-1 text-[13px] leading-relaxed text-navy-700">
+   212→   212→            Insufficient moisture barrier · Higher oxygen transmission · Poor
+   213→   213→            temperature suitability · Higher estimated cost
+   214→   214→          </p>
+   215→   215→        </div>
+   216→   216→      </div>
+   217→   217→    ),
+   218→   218→  },
+   219→   219→  {
+   220→   220→    num: "06",
+   221→   221→    title: "Validate Before Final Adoption",
+   222→   222→    desc: "A recommendation is decision support, not approval. Before commercial adoption, the shortlisted material should pass structured validation — from datasheet verification to shelf-life studies.",
+   223→   223→    extra: VALIDATION_CALLOUT,
+   224→   224→  },
+   225→   225→];
+   226→   226→
+   227→   227→// ---------------------------------------------------------------------------
+   228→   228→// Section 4 data — engine pipeline (9 numbered nodes)
+   229→   229→// ---------------------------------------------------------------------------
+   230→   230→
+   231→   231→const ENGINE_FLOW = [
+   232→   232→  "User Inputs",
+   233→   233→  "Food Characteristics",
+   234→   234→  "Storage & Environment",
+   235→   235→  "Shelf-Life Target",
+   236→   236→  "Packaging Requirements",
+   237→   237→  "Material Property Matching",
+   238→   238→  "Constraint Filtering",
+   239→   239→  "Multi-Criteria Scoring",
+   240→   240→  "Explainable Recommendation",
+   241→   241→];
+   242→   242→
+   243→   243→const INTEL_LAYERS = [
+   244→   244→  "Food-science rules",
+   245→   245→  "Packaging property data",
+   246→   246→  "Requirement thresholds",
+   247→   247→  "Constraint filtering",
+   248→   248→  "Multi-factor scoring",
+   249→   249→  "Explainable reasoning",
+   250→   250→  "Optional LLM layer for natural-language explanation only",
+   251→   251→];
+   252→   252→
+   253→   253→// ---------------------------------------------------------------------------
+   254→   254→// Section 5 & 6 data
+   255→   255→// ---------------------------------------------------------------------------
+   256→   256→
+   257→   257→const AUDIENCE = [
+   258→   258→  {
+   259→   259→    icon: Sprout,
+   260→   260→    title: "Farmers",
+   261→   261→    desc: "Understand packaging options without needing advanced packaging expertise.",
+   262→   262→  },
+   263→   263→  {
+   264→   264→    icon: Building2,
+   265→   265→    title: "MSMEs & Food Startups",
+   266→   266→    desc: "Shortlist suitable packaging faster — before committing budget to trials.",
+   267→   267→  },
+   268→   268→  {
+   269→   269→    icon: Factory,
+   270→   270→    title: "Packaging Manufacturers",
+   271→   271→    desc: "Understand food-specific packaging requirements behind every enquiry.",
+   272→   272→  },
+   273→   273→  {
+   274→   274→    icon: Microscope,
+   275→   275→    title: "Food Technologists / Experts",
+   276→   276→    desc: "Use as a decision-support and comparison tool alongside your own expertise.",
+   277→   277→  },
+   278→   278→];
+   279→   279→
+   280→   280→const PILLARS = [
+   281→   281→  {
+   282→   282→    icon: Wheat,
+   283→   283→    title: "Reduce Food Loss",
+   284→   284→    desc: "Better packaging decisions can help protect food quality and shelf life.",
+   285→   285→  },
+   286→   286→  {
+   287→   287→    icon: ClipboardCheck,
+   288→   288→    title: "Reduce Trial-and-Error",
+   289→   289→    desc: "Shortlist candidate materials before committing to physical testing.",
+   290→   290→  },
+   291→   291→  {
+   292→   292→    icon: Store,
+   293→   293→    title: "Support MSMEs",
+   294→   294→    desc: "Make packaging knowledge more accessible to smaller food businesses.",
+   295→   295→  },
+   296→   296→  {
+   297→   297→    icon: Recycle,
+   298→   298→    title: "Encourage Sustainable Choices",
+   299→   299→    desc: "Sustainability becomes part of selection, not an afterthought.",
+   300→   300→  },
+   301→   301→];
+   302→   302→
+   303→   303→// ---------------------------------------------------------------------------
+   304→   304→// View
+   305→   305→// ---------------------------------------------------------------------------
+   306→   306→
+   307→   307→export default function HomeView() {
+   308→   308→  const setView = usePackVeda((s) => s.setView);
+   309→   309→
+   310→   310→  const scrollToHowItWorks = () => {
+   311→   311→    document
+   312→   312→      .getElementById("how-it-works")
+   313→   313→      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+   314→   314→  };
+   315→   315→
+   316→   316→  return (
+   317→   317→    <div className="bg-cream-50">
+   318→   318→      {/* ================= 1. HERO ================= */}
+   319→   319→      <section
+   320→   320→        aria-label="PackVeda introduction"
+   321→   321→        className="relative overflow-hidden bg-navy-950 bg-grid-navy"
+   322→   322→      >
+   323→   323→        {/* subtle radial emerald glows */}
+   324→   324→        <div aria-hidden className="pointer-events-none absolute inset-0">
+   325→   325→          <div className="absolute -top-24 right-[-6rem] h-96 w-96 rounded-full bg-emerald-400/10 blur-3xl" />
+   326→   326→          <div className="absolute bottom-[-8rem] left-1/4 h-80 w-80 rounded-full bg-forest-500/10 blur-3xl" />
+   327→   327→        </div>
+   328→   328→
+   329→   329→        <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 md:py-24 lg:px-8 lg:py-28">
+   330→   330→          <div className="grid items-center gap-14 lg:grid-cols-2 lg:gap-12">
+   331→   331→            {/* LEFT — copy + CTAs */}
+   332→   332→            <div className="flex flex-col items-start gap-6">
+   333→   333→              <motion.div
+   334→   334→                {...fadeUp}
+   335→   335→                transition={{ duration: 0.5, ease: "easeOut" }}
+   336→   336→                className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-1.5"
+   337→   337→              >
+   338→   338→                <Award className="size-3.5 text-emerald-300" aria-hidden />
+   339→   339→                <span className="text-xs font-medium tracking-wide text-emerald-300">
+   340→   340→                  Smart India Hackathon 2026 · PS 26236
+   341→   341→                </span>
+   342→   342→              </motion.div>
+   343→   343→
+   344→   344→              <motion.div
+   345→   345→                {...fadeUp}
+   346→   346→                transition={{ duration: 0.5, ease: "easeOut" }}
+   347→   347→                className="flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg shadow-black/25 ring-1 ring-white/25 sm:size-20"
+   348→   348→              >
+   349→   349→                <Image
+   350→   350→                  src="/packveda-icon.png"
+   351→   351→                  alt="PackVeda logo — intelligent food packaging"
+   352→   352→                  width={80}
+   353→   353→                  height={80}
+   354→   354→                  priority
+   355→   355→                  className="size-full object-contain"
+   356→   356→                />
+   357→   357→              </motion.div>
+   358→   358→
+   359→   359→              <motion.h1
+   360→   360→                {...fadeUp}
+   361→   361→                transition={{ duration: 0.55, delay: 0.06, ease: "easeOut" }}
+   362→   362→                className="text-5xl font-bold tracking-wide text-cream-50 sm:text-6xl lg:text-7xl"
+   363→   363→              >
+   364→   364→                PACK
+   365→   365→                <span className="bg-gradient-to-r from-emerald-400 to-sand-400 bg-clip-text text-transparent">
+   366→   366→                  VEDA
+   367→   367→                </span>
+   368→   368→              </motion.h1>
+   369→   369→
+   370→   370→              <motion.p
+   371→   371→                {...fadeUp}
+   372→   372→                transition={{ duration: 0.55, delay: 0.12, ease: "easeOut" }}
+   373→   373→                className="text-xl font-medium text-cream-100/90 md:text-2xl"
+   374→   374→              >
+   375→   375→                AI-Powered Food Packaging Intelligence
+   376→   376→              </motion.p>
+   377→   377→
+   378→   378→              <motion.p
+   379→   379→                {...fadeUp}
+   380→   380→                transition={{ duration: 0.55, delay: 0.18, ease: "easeOut" }}
+   381→   381→                className="text-base font-semibold tracking-wide text-emerald-400 md:text-lg"
+   382→   382→              >
+   383→   383→                Smarter Packaging. Safer Food. Longer Shelf Life.
+   384→   384→              </motion.p>
+   385→   385→
+   386→   386→              <motion.p
+   387→   387→                {...fadeUp}
+   388→   388→                transition={{ duration: 0.55, delay: 0.24, ease: "easeOut" }}
+   389→   389→                className="max-w-xl text-base leading-relaxed text-cream-100/70 md:text-lg"
+   390→   390→              >
+   391→   391→                PackVeda converts food composition and storage conditions into
+   392→   392→                science-based packaging requirements, then shortlists suitable
+   393→   393→                packaging materials with explainable reasoning — before you
+   394→   394→                spend on physical trials.
+   395→   395→              </motion.p>
+   396→   396→
+   397→   397→              <motion.div
+   398→   398→                {...fadeUp}
+   399→   399→                transition={{ duration: 0.55, delay: 0.3, ease: "easeOut" }}
+   400→   400→                className="flex flex-col gap-3 sm:flex-row sm:items-center"
+   401→   401→              >
+   402→   402→                <Button
+   403→   403→                  size="lg"
+   404→   404→                  onClick={() => setView("analyze")}
+   405→   405→                  className="bg-forest-600 text-white hover:bg-forest-500"
+   406→   406→                >
+   407→   407→                  Start Packaging Analysis
+   408→   408→                  <ArrowRight className="size-4" aria-hidden />
+   409→   409→                </Button>
+   410→   410→                <Button
+   411→   411→                  size="lg"
+   412→   412→                  variant="outline"
+   413→   413→                  onClick={scrollToHowItWorks}
+   414→   414→                  className="border-white/25 bg-transparent text-cream-50 hover:bg-white/10 hover:text-cream-50"
+   415→   415→                >
+   416→   416→                  Explore How It Works
+   417→   417→                  <ArrowDown className="size-4" aria-hidden />
+   418→   418→                </Button>
+   419→   419→              </motion.div>
+   420→   420→
+   421→   421→              <motion.p
+   422→   422→                {...fadeUp}
+   423→   423→                transition={{ duration: 0.55, delay: 0.36, ease: "easeOut" }}
+   424→   424→                className="flex max-w-xl items-start gap-2.5 text-xs leading-relaxed text-cream-100/60"
+   425→   425→              >
+   426→   426→                <ShieldCheck
+   427→   427→                  className="mt-0.5 size-4 shrink-0 text-emerald-400"
+   428→   428→                  aria-hidden
+   429→   429→                />
+   430→   430→                Decision support powered by food-science rules, packaging
+   431→   431→                properties, and explainable recommendation logic. Not
+   432→   432→                laboratory-validated output.
+   433→   433→              </motion.p>
+   434→   434→            </div>
+   435→   435→
+   436→   436→            {/* RIGHT — pipeline diagram */}
+   437→   437→            <motion.div
+   438→   438→              initial={{ opacity: 0, y: 24 }}
+   439→   439→              whileInView={{ opacity: 1, y: 0 }}
+   440→   440→              viewport={{ once: true }}
+   441→   441→              transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
+   442→   442→              className="w-full"
+   443→   443→            >
+   444→   444→              <RecommendationPipeline />
+   445→   445→            </motion.div>
+   446→   446→          </div>
+   447→   447→        </div>
+   448→   448→      </section>
+   449→   449→
+   450→   450→      {/* ================= 2. WHY PACKAGING SELECTION IS STILL DIFFICULT ================= */}
+   451→   451→      <section
+   452→   452→        aria-labelledby="why-heading"
+   453→   453→        className="bg-cream-100 py-16 md:py-24"
+   454→   454→      >
+   455→   455→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   456→   456→          <SectionHeading
+   457→   457→            eyebrow="The Problem"
+   458→   458→            title="Why Packaging Selection Is Still Difficult"
+   459→   459→            description="The right package is not one-size-fits-all. It depends on the food itself, the environment it lives in, and the journey it takes — at least eleven factors at once."
+   460→   460→          />
+   461→   461→
+   462→   462→          <div className="mt-12 grid gap-8 lg:grid-cols-2 lg:items-start lg:gap-10">
+   463→   463→            {/* LEFT — factor chips */}
+   464→   464→            <motion.div {...fadeUp} transition={{ duration: 0.5, ease: "easeOut" }}>
+   465→   465→              <p className="max-w-xl text-base leading-relaxed text-navy-700">
+   466→   466→                Packaging requirements change with every product, because every
+   467→   467→                product interacts differently with oxygen, moisture, light and
+   468→   468→                time. A high-fat food fears rancidity; a hygroscopic powder
+   469→   469→                fears caking; fresh produce needs to keep breathing. Getting
+   470→   470→                this wrong shortens shelf life and wastes food.
+   471→   471→              </p>
+   472→   472→              <ul className="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+   473→   473→                {FACTORS.map((factor, i) => {
+   474→   474→                  const Icon = factor.icon;
+   475→   475→                  return (
+   476→   476→                    <motion.li
+   477→   477→                      key={factor.label}
+   478→   478→                      initial={{ opacity: 0, y: 10 }}
+   479→   479→                      whileInView={{ opacity: 1, y: 0 }}
+   480→   480→                      viewport={{ once: true }}
+   481→   481→                      transition={{ duration: 0.35, delay: i * 0.04 }}
+   482→   482→                      className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm"
+   483→   483→                    >
+   484→   484→                      <Icon
+   485→   485→                        className="size-4 shrink-0 text-forest-600"
+   486→   486→                        aria-hidden
+   487→   487→                      />
+   488→   488→                      <span className="text-[13px] font-medium text-navy-800">
+   489→   489→                        {factor.termKey ? (
+   490→   490→                          <Term k={factor.termKey} />
+   491→   491→                        ) : (
+   492→   492→                          factor.label
+   493→   493→                        )}
+   494→   494→                      </span>
+   495→   495→                    </motion.li>
+   496→   496→                  );
+   497→   497→                })}
+   498→   498→              </ul>
+   499→   499→            </motion.div>
+   500→   500→
+   501→   501→            {/* RIGHT — traditional workflow card */}
+   502→   502→            <motion.div
+   503→   503→              {...fadeUp}
+   504→   504→              transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
+   505→   505→              className="rounded-xl border border-border bg-card p-6 shadow-sm"
+   506→   506→            >
+   507→   507→              <h3 className="text-sm font-semibold uppercase tracking-wider text-navy-600">
+   508→   508→                The traditional workflow today
+   509→   509→              </h3>
+   510→   510→              <div className="mt-5">
+   511→   511→                <TraditionalFlow />
+   512→   512→              </div>
+   513→   513→              <div className="my-5 flex justify-center" aria-hidden>
+   514→   514→                <ArrowDown className="size-5 text-forest-600" />
+   515→   515→              </div>
+   516→   516→              <div className="rounded-lg border border-forest-600/25 bg-forest-50 p-4 text-center">
+   517→   517→                <p className="text-sm font-semibold leading-relaxed text-forest-800">
+   518→   518→                  PackVeda simplifies this workflow into an intelligent
+   519→   519→                  decision-support process.
+   520→   520→                </p>
+   521→   521→              </div>
+   522→   522→            </motion.div>
+   523→   523→          </div>
+   524→   524→        </div>
+   525→   525→      </section>
+   526→   526→
+   527→   527→      {/* ================= 3. HOW PACKVEDA WORKS ================= */}
+   528→   528→      <section
+   529→   529→        id="how-it-works"
+   530→   530→        aria-labelledby="how-heading"
+   531→   531→        className="bg-white py-16 md:py-24"
+   532→   532→      >
+   533→   533→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   534→   534→          <SectionHeading
+   535→   535→            eyebrow="The Workflow"
+   536→   536→            title="How PackVeda Works"
+   537→   537→            description="Six structured steps — from describing your food to a validated packaging decision. Every step is transparent, and none of them replaces testing."
+   538→   538→          />
+   539→   539→
+   540→   540→          <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+   541→   541→            {STEPS.map((step, i) => (
+   542→   542→              <motion.article
+   543→   543→                key={step.num}
+   544→   544→                {...fadeUp}
+   545→   545→                transition={{ duration: 0.45, delay: (i % 3) * 0.08, ease: "easeOut" }}
+   546→   546→                className="flex flex-col rounded-xl border border-border bg-card p-6 shadow-sm"
+   547→   547→              >
+   548→   548→                <div className="mb-3 flex items-center justify-between">
+   549→   549→                  <span
+   550→   550→                    aria-hidden
+   551→   551→                    className="font-mono text-3xl font-bold text-forest-600/25"
+   552→   552→                  >
+   553→   553→                    {step.num}
+   554→   554→                  </span>
+   555→   555→                  <span className="sr-only">Step {step.num}</span>
+   556→   556→                </div>
+   557→   557→                <h3 className="text-base font-semibold text-navy-950">
+   558→   558→                  {step.title}
+   559→   559→                </h3>
+   560→   560→                <p className="mt-2 text-sm leading-relaxed text-navy-600">
+   561→   561→                  {step.desc}
+   562→   562→                </p>
+   563→   563→                {step.bullets && (
+   564→   564→                  <ul className="mt-4 space-y-1.5">
+   565→   565→                    {step.bullets.map((b) => (
+   566→   566→                      <li
+   567→   567→                        key={b}
+   568→   568→                        className="flex items-start gap-2 text-[13px] leading-relaxed text-navy-700"
+   569→   569→                      >
+   570→   570→                        <CheckCircle2
+   571→   571→                          className="mt-0.5 size-3.5 shrink-0 text-forest-600"
+   572→   572→                          aria-hidden
+   573→   573→                        />
+   574→   574→                        {b}
+   575→   575→                      </li>
+   576→   576→                    ))}
+   577→   577→                  </ul>
+   578→   578→                )}
+   579→   579→                {step.extra}
+   580→   580→              </motion.article>
+   581→   581→            ))}
+   582→   582→          </div>
+   583→   583→
+   584→   584→          {/* End-to-end ecosystem: Recommend → Match → Compare → Connect → Validate */}
+   585→   585→          <motion.div
+   586→   586→            {...fadeUp}
+   587→   587→            transition={{ duration: 0.5, ease: "easeOut" }}
+   588→   588→            className="mt-10"
+   589→   589→          >
+   590→   590→            <EcosystemPillars />
+   591→   591→            <p className="mt-4 text-center text-xs text-navy-600">
+   592→   592→              Trial &amp; Validation runs after selection — a real-world verification stage,
+   593→   593→              not an AI step.
+   594→   594→            </p>
+   595→   595→          </motion.div>
+   596→   596→        </div>
+   597→   597→      </section>
+   598→   598→
+   599→   599→      {/* ================= 4. INSIDE THE ENGINE ================= */}
+   600→   600→      <section
+   601→   601→        aria-labelledby="engine-heading"
+   602→   602→        className="relative overflow-hidden bg-navy-950 bg-grid-navy py-16 md:py-24"
+   603→   603→      >
+   604→   604→        <div aria-hidden className="pointer-events-none absolute inset-0">
+   605→   605→          <div className="absolute left-[-6rem] top-1/3 h-80 w-80 rounded-full bg-emerald-400/10 blur-3xl" />
+   606→   606→        </div>
+   607→   607→
+   608→   608→        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   609→   609→          <SectionHeading
+   610→   610→            eyebrow="Inside the Engine"
+   611→   611→            title="Inside the PackVeda Intelligence Engine"
+   612→   612→            description="A deterministic pipeline — from your inputs to an explainable recommendation. No hidden steps, no invented numbers."
+   613→   613→            align="left"
+   614→   614→            dark
+   615→   615→          />
+   616→   616→
+   617→   617→          <div className="mt-12 grid gap-10 lg:grid-cols-2 lg:gap-12">
+   618→   618→            {/* LEFT — numbered pipeline */}
+   619→   619→            <div>
+   620→   620→              <div
+   621→   621→                className="grid grid-cols-1 gap-2.5 sm:grid-cols-2"
+   622→   622→                role="list"
+   623→   623→                aria-label="PackVeda engine pipeline"
+   624→   624→              >
+   625→   625→                {ENGINE_FLOW.map((label, i) => {
+   626→   626→                  const isFinal = i === ENGINE_FLOW.length - 1;
+   627→   627→                  return (
+   628→   628→                    <motion.div
+   629→   629→                      key={label}
+   630→   630→                      initial={{ opacity: 0, x: -14 }}
+   631→   631→                      whileInView={{ opacity: 1, x: 0 }}
+   632→   632→                      viewport={{ once: true }}
+   633→   633→                      transition={{ duration: 0.4, delay: i * 0.06, ease: "easeOut" }}
+   634→   634→                      role="listitem"
+   635→   635→                      className={
+   636→   636→                        isFinal
+   637→   637→                          ? "flex items-center gap-3 rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 shadow-[0_0_24px_rgba(52,211,153,0.12)] sm:col-span-2"
+   638→   638→                          : "flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3"
+   639→   639→                      }
+   640→   640→                    >
+   641→   641→                      <span
+   642→   642→                        className={
+   643→   643→                          isFinal
+   644→   644→                            ? "flex size-7 shrink-0 items-center justify-center rounded-md border border-emerald-400/40 bg-emerald-400/20 font-mono text-xs font-semibold text-emerald-300"
+   645→   645→                            : "flex size-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 font-mono text-xs font-semibold text-cream-100/70"
+   646→   646→                        }
+   647→   647→                        aria-hidden
+   648→   648→                      >
+   649→   649→                        {String(i + 1).padStart(2, "0")}
+   650→   650→                      </span>
+   651→   651→                      <span
+   652→   652→                        className={
+   653→   653→                          isFinal
+   654→   654→                            ? "text-sm font-semibold text-emerald-200"
+   655→   655→                            : "text-sm font-medium text-cream-50/90"
+   656→   656→                        }
+   657→   657→                      >
+   658→   658→                        {label}
+   659→   659→                      </span>
+   660→   660→                      {isFinal && (
+   661→   661→                        <Sparkles
+   662→   662→                          className="ml-auto size-4 shrink-0 text-emerald-300"
+   663→   663→                          aria-hidden
+   664→   664→                        />
+   665→   665→                      )}
+   666→   666→                    </motion.div>
+   667→   667→                  );
+   668→   668→                })}
+   669→   669→              </div>
+   670→   670→              <p className="mt-3 text-xs text-cream-100/50">
+   671→   671→                Steps run in numeric order — your inputs first, the explainable
+   672→   672→                recommendation last.
+   673→   673→              </p>
+   674→   674→            </div>
+   675→   675→
+   676→   676→            {/* RIGHT — Not just an LLM */}
+   677→   677→            <motion.div
+   678→   678→              {...fadeUp}
+   679→   679→              transition={{ duration: 0.55, delay: 0.15, ease: "easeOut" }}
+   680→   680→              className="rounded-xl border border-white/10 bg-white/[0.04] p-6 md:p-8"
+   681→   681→            >
+   682→   682→              <div className="flex items-center gap-3">
+   683→   683→                <span className="flex size-10 items-center justify-center rounded-lg border border-emerald-400/30 bg-emerald-400/10">
+   684→   684→                  <BrainCircuit className="size-5 text-emerald-300" aria-hidden />
+   685→   685→                </span>
+   686→   686→                <h3 className="text-lg font-semibold text-cream-50">
+   687→   687→                  Not just an LLM
+   688→   688→                </h3>
+   689→   689→              </div>
+   690→   690→              <p className="mt-4 text-sm leading-relaxed text-cream-100/70">
+   691→   691→                The intelligence layer is a combination of structured,
+   692→   692→                checkable components — the language model is only an optional
+   693→   693→                narrator:
+   694→   694→              </p>
+   695→   695→              <ol className="mt-5 space-y-2.5">
+   696→   696→                {INTEL_LAYERS.map((layer, i) => (
+   697→   697→                  <li key={layer} className="flex items-start gap-3">
+   698→   698→                    <span
+   699→   699→                      aria-hidden
+   700→   700→                      className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 font-mono text-[11px] font-semibold text-cream-100/70"
+   701→   701→                    >
+   702→   702→                      {i + 1}
+   703→   703→                    </span>
+   704→   704→                    <span
+   705→   705→                      className={
+   706→   706→                        i === INTEL_LAYERS.length - 1
+   707→   707→                          ? "text-[13px] italic leading-relaxed text-cream-100/60"
+   708→   708→                          : "text-sm leading-relaxed text-cream-50/90"
+   709→   709→                      }
+   710→   710→                    >
+   711→   711→                      {layer}
+   712→   712→                    </span>
+   713→   713→                  </li>
+   714→   714→                ))}
+   715→   715→              </ol>
+   716→   716→              <div className="mt-6 rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-3.5">
+   717→   717→                <p className="flex items-start gap-2 text-[13px] font-medium leading-relaxed text-emerald-200">
+   718→   718→                  <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+   719→   719→                  The LLM never invents OTR/WVTR values or scientific facts.
+   720→   720→                </p>
+   721→   721→              </div>
+   722→   722→              <div className="mt-5 flex flex-wrap gap-2">
+   723→   723→                <MaturityBadge status="available" label="Deterministic core" />
+   724→   724→                <MaturityBadge
+   725→   725→                  status="future"
+   726→   726→                  label="Optional LLM explanation layer"
+   727→   727→                  className="bg-white/10 text-cream-100 border-white/25"
+   728→   728→                />
+   729→   729→              </div>
+   730→   730→            </motion.div>
+   731→   731→          </div>
+   732→   732→        </div>
+   733→   733→      </section>
+   734→   734→
+   735→   735→      {/* ================= 4b. HOW THE MATCHING WORKS ================= */}
+   736→   736→      <section
+   737→   737→        aria-labelledby="matching-heading"
+   738→   738→        className="bg-white py-16 md:py-24"
+   739→   739→      >
+   740→   740→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   741→   741→          <SectionHeading
+   742→   742→            eyebrow="Matching, not guessing"
+   743→   743→            title="How the Matching Works"
+   744→   744→            description="PackVeda is an actual matching system — not an LLM wrapper. Derived packaging requirements are checked property-by-property against each material's real values, with a visible reason for every verdict."
+   745→   745→          />
+   746→   746→
+   747→   747→          <div className="mt-12 grid items-stretch gap-6 lg:grid-cols-[1fr_auto_1fr]">
+   748→   748→            {/* Requirements side */}
+   749→   749→            <motion.div
+   750→   750→              {...fadeUp}
+   751→   751→              transition={{ duration: 0.45, ease: "easeOut" }}
+   752→   752→              className="rounded-xl border border-forest-600/25 bg-forest-50 p-6"
+   753→   753→            >
+   754→   754→              <p className="text-xs font-bold uppercase tracking-[0.15em] text-forest-700">
+   755→   755→                Your packaging requirements
+   756→   756→              </p>
+   757→   757→              <ul className="mt-4 space-y-3">
+   758→   758→                {[
+   759→   759→                  ["Oxygen barrier", "HIGH"],
+   760→   760→                  ["Moisture barrier", "HIGH"],
+   761→   761→                  ["Mechanical strength", "MEDIUM"],
+   762→   762→                  ["Temperature", "AMBIENT"],
+   763→   763→                  ["Shelf life", "12 MONTHS"],
+   764→   764→                ].map(([k, v]) => (
+   765→   765→                  <li key={k} className="flex items-center justify-between gap-3 border-b border-forest-600/15 pb-2.5 last:border-0">
+   766→   766→                    <span className="text-sm font-medium text-navy-900">{k}</span>
+   767→   767→                    <span className="rounded bg-forest-700 px-2 py-0.5 text-[10.5px] font-bold tracking-wide text-white">{v}</span>
+   768→   768→                  </li>
+   769→   769→                ))}
+   770→   770→              </ul>
+   771→   771→              <p className="mt-4 text-[11.5px] leading-relaxed text-navy-600">
+   772→   772→                Example profile — yours are derived from your food &amp; storage inputs by
+   773→   773→                science rules, not templates.
+   774→   774→              </p>
+   775→   775→            </motion.div>
+   776→   776→
+   777→   777→            {/* Engine in the middle */}
+   778→   778→            <div className="flex flex-row items-center justify-center gap-3 lg:flex-col">
+   779→   779→              <motion.div
+   780→   780→                {...fadeUp}
+   781→   781→                transition={{ duration: 0.45, delay: 0.1, ease: "easeOut" }}
+   782→   782→                className="flex flex-col items-center gap-1.5 rounded-xl bg-navy-950 px-5 py-4 text-center shadow-lg"
+   783→   783→              >
+   784→   784→                <BrainCircuit className="size-6 text-emerald-400" aria-hidden />
+   785→   785→                <p className="text-[11px] font-bold uppercase tracking-wider text-cream-50">Matching</p>
+   786→   786→                <p className="text-[10px] text-cream-100/60">engine</p>
+   787→   787→              </motion.div>
+   788→   788→              <ArrowRight className="size-5 rotate-180 text-navy-600/40 lg:rotate-90" aria-hidden />
+   789→   789→            </div>
+   790→   790→
+   791→   791→            {/* Materials side */}
+   792→   792→            <motion.div
+   793→   793→              {...fadeUp}
+   794→   794→              transition={{ duration: 0.45, delay: 0.15, ease: "easeOut" }}
+   795→   795→              className="rounded-xl border border-border bg-card p-6 shadow-sm"
+   796→   796→            >
+   797→   797→              <p className="text-xs font-bold uppercase tracking-[0.15em] text-navy-800">
+   798→   798→                Matched packaging options
+   799→   799→              </p>
+   800→   800→              <div className="mt-4 space-y-4">
+   801→   801→                {[
+   802→   802→                  { name: "Material A — high-barrier laminate", rows: [["Oxygen", "match"], ["Moisture", "match"], ["Temperature", "match"]] },
+   803→   803→                  { name: "Material B — metallised film", rows: [["Oxygen", "match"], ["Moisture", "partial"], ["Temperature", "match"]] },
+   804→   804→                  { name: "Material C — mono PE film", rows: [["Oxygen", "partial"], ["Moisture", "match"], ["Temperature", "match"]] },
+   805→   805→                ].map((m) => (
+   806→   806→                  <div key={m.name} className="rounded-lg border border-border bg-cream-50 p-3.5">
+   807→   807→                    <p className="text-[13px] font-semibold text-navy-950">{m.name}</p>
+   808→   808→                    <ul className="mt-2 flex flex-wrap gap-1.5">
+   809→   809→                      {m.rows.map(([k, st]) => (
+   810→   810→                        <li
+   811→   811→                          key={k}
+   812→   812→                          className={
+   813→   813→                            st === "match"
+   814→   814→                              ? "flex items-center gap-1 rounded-full border border-forest-600/30 bg-forest-50 px-2 py-0.5 text-[10.5px] font-semibold text-forest-800"
+   815→   815→                              : "flex items-center gap-1 rounded-full border border-amber-warm-600/35 bg-amber-warm-50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-warm-600"
+   816→   816→                          }
+   817→   817→                        >
+   818→   818→                          {st === "match" ? (
+   819→   819→                            <CheckCircle2 className="size-3" aria-hidden />
+   820→   820→                          ) : (
+   821→   821→                            <TriangleAlert className="size-3" aria-hidden />
+   822→   822→                          )}
+   823→   823→                          {k}: {st === "match" ? "MATCH" : "PARTIAL"}
+   824→   824→                        </li>
+   825→   825→                      ))}
+   826→   826→                    </ul>
+   827→   827→                  </div>
+   828→   828→                ))}
+   829→   829→              </div>
+   830→   830→              <p className="mt-4 text-[11.5px] leading-relaxed text-navy-600">
+   831→   831→                Every ✓ and △ comes with an explanation — the same rules power your
+   832→   832→                results page and the Packaging Matching view.
+   833→   833→              </p>
+   834→   834→            </motion.div>
+   835→   835→          </div>
+   836→   836→
+   837→   837→          <motion.div
+   838→   838→            {...fadeUp}
+   839→   839→            transition={{ duration: 0.45, delay: 0.2, ease: "easeOut" }}
+   840→   840→            className="mt-8 flex justify-center gap-3"
+   841→   841→          >
+   842→   842→            <Button
+   843→   843→              variant="outline"
+   844→   844→              onClick={() => setView("matching")}
+   845→   845→              className="border-forest-700/30 text-forest-800 hover:bg-forest-50"
+   846→   846→            >
+   847→   847→              <Layers className="size-4" aria-hidden />
+   848→   848→              See Packaging Matching
+   849→   849→            </Button>
+   850→   850→            <Button
+   851→   851→              variant="outline"
+   852→   852→              onClick={() => setView("marketplace")}
+   853→   853→              className="border-terracotta-500/40 text-terracotta-700 hover:bg-terracotta-50"
+   854→   854→            >
+   855→   855→              <Store className="size-4" aria-hidden />
+   856→   856→              Browse Marketplace
+   857→   857→            </Button>
+   858→   858→          </motion.div>
+   859→   859→        </div>
+   860→   860→      </section>
+   861→   861→
+   862→   862→      {/* ================= 5. WHO IS PACKVEDA FOR ================= */}
+   863→   863→      <section
+   864→   864→        aria-labelledby="who-heading"
+   865→   865→        className="bg-cream-100 py-16 md:py-24"
+   866→   866→      >
+   867→   867→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   868→   868→          <SectionHeading
+   869→   869→            eyebrow="Audience"
+   870→   870→            title="Who Is PackVeda For?"
+   871→   871→            description="One knowledge base, four kinds of decision-makers — each getting the same transparent shortlisting process."
+   872→   872→          />
+   873→   873→
+   874→   874→          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+   875→   875→            {AUDIENCE.map((a, i) => {
+   876→   876→              const Icon = a.icon;
+   877→   877→              return (
+   878→   878→                <motion.div
+   879→   879→                  key={a.title}
+   880→   880→                  {...fadeUp}
+   881→   881→                  transition={{ duration: 0.45, delay: i * 0.08, ease: "easeOut" }}
+   882→   882→                  className="rounded-xl border border-border bg-card p-6 shadow-sm"
+   883→   883→                >
+   884→   884→                  <span className="flex size-11 items-center justify-center rounded-lg bg-forest-100 text-forest-700">
+   885→   885→                    <Icon className="size-5" aria-hidden />
+   886→   886→                  </span>
+   887→   887→                  <h3 className="mt-4 text-base font-semibold text-navy-950">
+   888→   888→                    {a.title}
+   889→   889→                  </h3>
+   890→   890→                  <p className="mt-2 text-sm leading-relaxed text-navy-600">
+   891→   891→                    {a.desc}
+   892→   892→                  </p>
+   893→   893→                </motion.div>
+   894→   894→              );
+   895→   895→            })}
+   896→   896→          </div>
+   897→   897→        </div>
+   898→   898→      </section>
+   899→   899→
+   900→   900→      {/* ================= 6. WHY PACKVEDA MATTERS ================= */}
+   901→   901→      <section
+   902→   902→        aria-labelledby="matters-heading"
+   903→   903→        className="bg-white py-16 md:py-24"
+   904→   904→      >
+   905→   905→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   906→   906→          <SectionHeading
+   907→   907→            eyebrow="Impact"
+   908→   908→            title="Why PackVeda Matters"
+   909→   909→            description="Food loss, wasted trials and inaccessible expertise are packaging problems before they are storage problems."
+   910→   910→          />
+   911→   911→
+   912→   912→          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+   913→   913→            {PILLARS.map((p, i) => {
+   914→   914→              const Icon = p.icon;
+   915→   915→              return (
+   916→   916→                <motion.div
+   917→   917→                  key={p.title}
+   918→   918→                  {...fadeUp}
+   919→   919→                  transition={{ duration: 0.45, delay: i * 0.08, ease: "easeOut" }}
+   920→   920→                  className="rounded-xl border border-border bg-card p-6 shadow-sm"
+   921→   921→                >
+   922→   922→                  <span className="flex size-11 items-center justify-center rounded-lg bg-forest-100 text-forest-700">
+   923→   923→                    <Icon className="size-5" aria-hidden />
+   924→   924→                  </span>
+   925→   925→                  <h3 className="mt-4 text-base font-semibold text-navy-950">
+   926→   926→                    {p.title}
+   927→   927→                  </h3>
+   928→   928→                  <p className="mt-2 text-sm leading-relaxed text-navy-600">
+   929→   929→                    {p.desc}
+   930→   930→                  </p>
+   931→   931→                </motion.div>
+   932→   932→              );
+   933→   933→            })}
+   934→   934→          </div>
+   935→   935→
+   936→   936→          <motion.p
+   937→   937→            {...fadeUp}
+   938→   938→            transition={{ duration: 0.45, ease: "easeOut" }}
+   939→   939→            className="mx-auto mt-10 max-w-2xl text-center text-xs italic leading-relaxed text-navy-600/80"
+   940→   940→          >
+   941→   941→            No specific reduction percentages are claimed; outcomes depend on
+   942→   942→            implementation and testing.
+   943→   943→          </motion.p>
+   944→   944→        </div>
+   945→   945→      </section>
+   946→   946→
+   947→   947→      {/* ================= 6b. FOR FOOD BUSINESSES / FOR MANUFACTURERS ================= */}
+   948→   948→      <section
+   949→   949→        aria-labelledby="sides-heading"
+   950→   950→        className="bg-cream-50 py-16 md:py-24"
+   951→   951→      >
+   952→   952→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+   953→   953→          <SectionHeading
+   954→   954→            eyebrow="Two perspectives, one platform"
+   955→   955→            title="For Food Businesses & For Packaging Manufacturers"
+   956→   956→            description="PackVeda connects the two sides of food packaging — buyers get matched materials, manufacturers get matched buyers."
+   957→   957→          />
+   958→   958→
+   959→   959→          <div className="mt-12 grid gap-6 lg:grid-cols-2">
+   960→   960→            {/* Buyer side */}
+   961→   961→            <motion.div
+   962→   962→              {...fadeUp}
+   963→   963→              transition={{ duration: 0.45, ease: "easeOut" }}
+   964→   964→              className="flex flex-col rounded-xl border border-forest-600/25 bg-white p-7 shadow-sm"
+   965→   965→            >
+   966→   966→              <div className="flex items-center gap-3">
+   967→   967→                <span className="flex size-11 items-center justify-center rounded-lg bg-forest-700 text-white">
+   968→   968→                  <Wheat className="size-5" aria-hidden />
+   969→   969→                </span>
+   970→   970→                <h3 id="sides-heading" className="text-lg font-bold text-navy-950">
+   971→   971→                  For Food Businesses
+   972→   972→                </h3>
+   973→   973→              </div>
+   974→   974→              <ul className="mt-5 flex-1 space-y-2.5">
+   975→   975→                {[
+   976→   976→                  "Create a food profile — commodity, composition, storage",
+   977→   977→                  "Get derived packaging requirements & AI recommendations",
+   978→   978→                  "See exactly which requirements each material matches",
+   979→   979→                  "Compare materials side-by-side and simulate scenarios",
+   980→   980→                  "Request samples & quotes from matched suppliers",
+   981→   981→                  "Track trials, build Packaging Passports",
+   982→   982→                ].map((b) => (
+   983→   983→                  <li key={b} className="flex items-start gap-2 text-sm text-navy-800">
+   984→   984→                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-forest-600" aria-hidden />
+   985→   985→                    {b}
+   986→   986→                  </li>
+   987→   987→                ))}
+   988→   988→              </ul>
+   989→   989→              <div className="mt-6 flex flex-wrap gap-2.5">
+   990→   990→                <Button
+   991→   991→                  onClick={() => setView("analyze")}
+   992→   992→                  className="bg-forest-700 hover:bg-forest-600"
+   993→   993→                >
+   994→   994→                  Start Packaging Analysis
+   995→   995→                  <ArrowRight className="size-4" aria-hidden />
+   996→   996→                </Button>
+   997→   997→                <Button
+   998→   998→                  variant="outline"
+   999→   999→                  onClick={() => setView("onboarding")}
+  1000→  1000→                  className="border-forest-700/30 text-forest-800 hover:bg-forest-50"
+  1001→  1001→                >
+  1002→  1002→                  Join as Buyer
+  1003→  1003→                </Button>
+  1004→  1004→              </div>
+  1005→  1005→            </motion.div>
+  1006→  1006→
+  1007→  1007→            {/* Seller side */}
+  1008→  1008→            <motion.div
+  1009→  1009→              {...fadeUp}
+  1010→  1010→              transition={{ duration: 0.45, delay: 0.1, ease: "easeOut" }}
+  1011→  1011→              className="flex flex-col rounded-xl border border-terracotta-500/30 bg-white p-7 shadow-sm"
+  1012→  1012→            >
+  1013→  1013→              <div className="flex items-center gap-3">
+  1014→  1014→                <span className="flex size-11 items-center justify-center rounded-lg bg-terracotta-600 text-white">
+  1015→  1015→                  <Factory className="size-5" aria-hidden />
+  1016→  1016→                </span>
+  1017→  1017→                <h3 className="text-lg font-bold text-navy-950">
+  1018→  1018→                  For Packaging Manufacturers
+  1019→  1019→                </h3>
+  1020→  1020→              </div>
+  1021→  1021→              <ul className="mt-5 flex-1 space-y-2.5">
+  1022→  1022→                {[
+  1023→  1023→                  "List materials with real structure & properties",
+  1024→  1024→                  "Share OTR, WVTR, thickness, MOQ, applications",
+  1025→  1025→                  "Get matched against buyer requirements automatically",
+  1026→  1026→                  "Receive sample & quote requests from food businesses",
+  1027→  1027→                  "Honest provenance: seller-declared, verification required",
+  1028→  1028→                  "No score manipulation — matching stays scientific",
+  1029→  1029→                ].map((b) => (
+  1030→  1030→                  <li key={b} className="flex items-start gap-2 text-sm text-navy-800">
+  1031→  1031→                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-terracotta-600" aria-hidden />
+  1032→  1032→                    {b}
+  1033→  1033→                  </li>
+  1034→  1034→                ))}
+  1035→  1035→              </ul>
+  1036→  1036→              <div className="mt-6 flex flex-wrap gap-2.5">
+  1037→  1037→                <Button
+  1038→  1038→                  onClick={() => setView("seller")}
+  1039→  1039→                  className="bg-terracotta-600 hover:bg-terracotta-500"
+  1040→  1040→                >
+  1041→  1041→                  <Store className="size-4" aria-hidden />
+  1042→  1042→                  Open Seller Studio
+  1043→  1043→                </Button>
+  1044→  1044→                <Button
+  1045→  1045→                  variant="outline"
+  1046→  1046→                  onClick={() => setView("onboarding")}
+  1047→  1047→                  className="border-terracotta-500/40 text-terracotta-700 hover:bg-terracotta-50"
+  1048→  1048→                >
+  1049→  1049→                  Join as Manufacturer
+  1050→  1050→                </Button>
+  1051→  1051→              </div>
+  1052→  1052→              <p className="mt-3 text-[11px] text-navy-600">
+  1053→  1053→                Supplier network is a prototype — listings are unverified until
+  1054→  1054→                documents are checked.
+  1055→  1055→              </p>
+  1056→  1056→            </motion.div>
+  1057→  1057→          </div>
+  1058→  1058→        </div>
+  1059→  1059→      </section>
+  1060→  1060→
+  1061→  1061→      {/* ================= 7. AI ≠ MAGIC ================= */}
+  1062→  1062→      <section
+  1063→  1063→        aria-labelledby="explain-heading"
+  1064→  1064→        className="bg-forest-50 py-16 md:py-24"
+  1065→  1065→      >
+  1066→  1066→        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+  1067→  1067→          <motion.div
+  1068→  1068→            {...fadeUp}
+  1069→  1069→            transition={{ duration: 0.55, ease: "easeOut" }}
+  1070→  1070→            className="mx-auto max-w-3xl text-center"
+  1071→  1071→          >
+  1072→  1072→            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-forest-600">
+  1073→  1073→              AI ≠ Magic
+  1074→  1074→            </p>
+  1075→  1075→            <h2
+  1076→  1076→              id="explain-heading"
+  1077→  1077→              className="mt-3 text-3xl font-bold tracking-tight text-navy-950 md:text-4xl"
+  1078→  1078→            >
+  1079→  1079→              Designed for Explainable Decisions
+  1080→  1080→            </h2>
+  1081→  1081→            <p className="mt-5 text-base leading-relaxed text-navy-800 md:text-lg">
+  1082→  1082→              PackVeda does not replace packaging scientists, laboratories, or
+  1083→  1083→              regulatory authorities. It helps users move from a large set of
+  1084→  1084→              possible packaging options to a smaller set of scientifically
+  1085→  1085→              relevant candidates.
+  1086→  1086→            </p>
+  1087→  1087→          </motion.div>
+  1088→  1088→
+  1089→  1089→          <div className="mx-auto mt-10 grid max-w-4xl gap-4 sm:grid-cols-3">
+  1090→  1090→            {[
+  1091→  1091→              {
+  1092→  1092→                icon: SearchCheck,
+  1093→  1093→                title: "Explainable logic",
+  1094→  1094→                desc: "Every score traceable",
+  1095→  1095→              },
+  1096→  1096→              {
+  1097→  1097→                icon: Database,
+  1098→  1098→                title: "Honest data",
+  1099→  1099→                desc: "Missing values shown as “Data not available”",
+  1100→  1100→              },
+  1101→  1101→              {
+  1102→  1102→                icon: FlaskConical,
+  1103→  1103→                title: "Validation-first",
+  1104→  1104→                desc: "Trials before adoption",
+  1105→  1105→              },
+  1106→  1106→            ].map((card, i) => {
+  1107→  1107→              const Icon = card.icon;
+  1108→  1108→              return (
+  1109→  1109→                <motion.div
+  1110→  1110→                  key={card.title}
+  1111→  1111→                  {...fadeUp}
+  1112→  1112→                  transition={{ duration: 0.45, delay: i * 0.08, ease: "easeOut" }}
+  1113→  1113→                  className="rounded-xl border border-forest-600/20 bg-white p-5 text-center shadow-sm"
+  1114→  1114→                >
+  1115→  1115→                  <span className="mx-auto flex size-10 items-center justify-center rounded-lg bg-forest-100 text-forest-700">
+  1116→  1116→                    <Icon className="size-5" aria-hidden />
+  1117→  1117→                  </span>
+  1118→  1118→                  <h3 className="mt-3 text-sm font-semibold text-navy-950">
+  1119→  1119→                    {card.title}
+  1120→  1120→                  </h3>
+  1121→  1121→                  <p className="mt-1 text-xs leading-relaxed text-navy-600">
+  1122→  1122→                    {card.desc}
+  1123→  1123→                  </p>
+  1124→  1124→                </motion.div>
+  1125→  1125→              );
+  1126→  1126→            })}
+  1127→  1127→          </div>
+  1128→  1128→        </div>
+  1129→  1129→      </section>
+  1130→  1130→
+  1131→  1131→      {/* ================= 8. FINAL CTA ================= */}
+  1132→  1132→      <section
+  1133→  1133→        aria-labelledby="cta-heading"
+  1134→  1134→        className="relative overflow-hidden bg-navy-950 bg-grid-navy py-20 md:py-28"
+  1135→  1135→      >
+  1136→  1136→        <div aria-hidden className="pointer-events-none absolute inset-0">
+  1137→  1137→          <div className="absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-emerald-400/10 blur-3xl" />
+  1138→  1138→        </div>
+  1139→  1139→
+  1140→  1140→        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
+  1141→  1141→          <motion.h2
+  1142→  1142→            {...fadeUp}
+  1143→  1143→            transition={{ duration: 0.55, ease: "easeOut" }}
+  1144→  1144→            id="cta-heading"
+  1145→  1145→            className="text-3xl font-bold tracking-tight text-cream-50 text-balance md:text-5xl"
+  1146→  1146→          >
+  1147→  1147→            From food characteristics to the right packaging — intelligently.
+  1148→  1148→          </motion.h2>
+  1149→  1149→          <motion.p
+  1150→  1150→            {...fadeUp}
+  1151→  1151→            transition={{ duration: 0.55, delay: 0.1, ease: "easeOut" }}
+  1152→  1152→            className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-cream-100/70"
+  1153→  1153→          >
+  1154→  1154→            Describe your food and storage scenario — PackVeda derives the
+  1155→  1155→            requirements, scores the materials and explains every result.
+  1156→  1156→          </motion.p>
+  1157→  1157→          <motion.div
+  1158→  1158→            {...fadeUp}
+  1159→  1159→            transition={{ duration: 0.55, delay: 0.2, ease: "easeOut" }}
+  1160→  1160→            className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row"
+  1161→  1161→          >
+  1162→  1162→            <Button
+  1163→  1163→              size="lg"
+  1164→  1164→              onClick={() => setView("analyze")}
+  1165→  1165→              className="bg-forest-600 text-white hover:bg-forest-500"
+  1166→  1166→            >
+  1167→  1167→              Start Packaging Analysis
+  1168→  1168→              <ArrowRight className="size-4" aria-hidden />
+  1169→  1169→            </Button>
+  1170→  1170→            <Button
+  1171→  1171→              size="lg"
+  1172→  1172→              variant="outline"
+  1173→  1173→              onClick={() => setView("dashboard")}
+  1174→  1174→              className="border-white/25 bg-transparent text-cream-50 hover:bg-white/10 hover:text-cream-50"
+  1175→  1175→            >
+  1176→  1176→              View Dashboard
+  1177→  1177→              <BarChart3 className="size-4" aria-hidden />
+  1178→  1178→            </Button>
+  1179→  1179→          </motion.div>
+  1180→  1180→        </div>
+  1181→  1181→      </section>
+  1182→  1182→    </div>
+  1183→  1183→  );
+  1184→  1184→}
+  1185→  1185→

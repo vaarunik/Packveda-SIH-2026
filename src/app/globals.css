@@ -1,0 +1,242 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* PACKVEDA palette — deep navy, forest green, emerald, warm cream, terracotta, amber, slate */
+  --color-navy-950: var(--navy-950);
+  --color-navy-900: var(--navy-900);
+  --color-navy-800: var(--navy-800);
+  --color-navy-700: var(--navy-700);
+  --color-navy-600: var(--navy-600);
+  --color-forest-800: var(--forest-800);
+  --color-forest-700: var(--forest-700);
+  --color-forest-600: var(--forest-600);
+  --color-forest-500: var(--forest-500);
+  --color-forest-100: var(--forest-100);
+  --color-forest-50: var(--forest-50);
+  --color-cream-50: var(--cream-50);
+  --color-cream-100: var(--cream-100);
+  --color-cream-200: var(--cream-200);
+  --color-cream-300: var(--cream-300);
+  --color-sand-400: var(--sand-400);
+  --color-sand-100: var(--sand-100);
+  --color-sand-200: var(--sand-200);
+  --color-terracotta-700: var(--terracotta-700);
+  --color-terracotta-600: var(--terracotta-600);
+  --color-terracotta-500: var(--terracotta-500);
+  --color-terracotta-100: var(--terracotta-100);
+  --color-terracotta-50: var(--terracotta-50);
+  --color-amber-warm-600: var(--amber-warm-600);
+  --color-amber-warm-500: var(--amber-warm-500);
+  --color-amber-warm-100: var(--amber-warm-100);
+  --color-amber-warm-50: var(--amber-warm-50);
+  --color-slate-pkv-700: var(--slate-pkv-700);
+  --color-slate-pkv-600: var(--slate-pkv-600);
+  --color-slate-pkv-500: var(--slate-pkv-500);
+  --color-slate-pkv-400: var(--slate-pkv-400);
+  --color-slate-pkv-100: var(--slate-pkv-100);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* PACKVEDA palette */
+  --navy-950: oklch(0.165 0.028 238); /* Deep Navy #061923 */
+  --navy-900: oklch(0.215 0.032 236); /* Dark Navy #0A2430 */
+  --navy-800: oklch(0.28 0.038 234);
+  --navy-700: oklch(0.35 0.042 232);
+  --navy-600: oklch(0.43 0.046 230);
+  --forest-800: oklch(0.36 0.08 168);
+  --forest-700: oklch(0.44 0.09 168); /* Forest Green #0B5D45 */
+  --forest-600: oklch(0.5 0.105 167);
+  --forest-500: oklch(0.56 0.115 166);
+  --forest-100: oklch(0.93 0.03 158);
+  --forest-50: oklch(0.965 0.02 156);
+  --cream-50: oklch(0.982 0.005 100); /* Warm Off-White #FAF9F5 */
+  --cream-100: oklch(0.958 0.013 92); /* Soft Cream #F5F1E8 */
+  --cream-200: oklch(0.935 0.018 92);
+  --cream-300: oklch(0.9 0.02 95);
+  --sand-400: oklch(0.78 0.045 85);
+  --sand-200: oklch(0.9 0.03 85);
+  --sand-100: oklch(0.95 0.02 85);
+
+  /* Warm accents — food identity, warnings, technical text */
+  --terracotta-700: oklch(0.5 0.11 40);
+  --terracotta-600: oklch(0.57 0.125 40);
+  --terracotta-500: oklch(0.63 0.135 42);
+  --terracotta-100: oklch(0.9 0.05 45);
+  --terracotta-50: oklch(0.955 0.028 45);
+  --amber-warm-600: oklch(0.62 0.11 75);
+  --amber-warm-500: oklch(0.7 0.125 78);
+  --amber-warm-100: oklch(0.92 0.055 85);
+  --amber-warm-50: oklch(0.96 0.032 88);
+  --slate-pkv-700: oklch(0.44 0.022 230);
+  --slate-pkv-600: oklch(0.5 0.024 230);
+  --slate-pkv-500: oklch(0.57 0.026 228);
+  --slate-pkv-400: oklch(0.7 0.025 235); /* Muted Slate #94A3B8 */
+  --slate-pkv-100: oklch(0.92 0.008 230);
+
+  --background: var(--cream-50);
+  --foreground: var(--navy-950);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--navy-950);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--navy-950);
+  --primary: var(--forest-700);
+  --primary-foreground: oklch(0.985 0.005 120);
+  --secondary: var(--cream-200);
+  --secondary-foreground: var(--navy-900);
+  --muted: var(--cream-200);
+  --muted-foreground: var(--navy-600);
+  --accent: var(--forest-50);
+  --accent-foreground: var(--forest-800);
+  --destructive: oklch(0.577 0.215 27);
+  --border: oklch(0.9 0.012 95);
+  --input: oklch(0.88 0.014 95);
+  --ring: var(--forest-600);
+  --chart-1: oklch(0.56 0.115 157);
+  --chart-2: oklch(0.42 0.05 240);
+  --chart-3: oklch(0.72 0.13 80);
+  --chart-4: oklch(0.63 0.14 30);
+  --chart-5: oklch(0.49 0.105 158);
+  --sidebar: var(--cream-50);
+  --sidebar-foreground: var(--navy-950);
+  --sidebar-primary: var(--forest-700);
+  --sidebar-primary-foreground: oklch(0.985 0.005 120);
+  --sidebar-accent: var(--cream-200);
+  --sidebar-accent-foreground: var(--navy-900);
+  --sidebar-border: oklch(0.9 0.012 95);
+  --sidebar-ring: var(--forest-600);
+}
+
+.dark {
+  --background: var(--navy-950);
+  --foreground: var(--cream-100);
+  --card: var(--navy-900);
+  --card-foreground: var(--cream-100);
+  --popover: var(--navy-900);
+  --popover-foreground: var(--cream-100);
+  --primary: var(--forest-500);
+  --primary-foreground: var(--navy-950);
+  --secondary: var(--navy-800);
+  --secondary-foreground: var(--cream-100);
+  --muted: var(--navy-800);
+  --muted-foreground: oklch(0.72 0.02 240);
+  --accent: var(--navy-800);
+  --accent-foreground: var(--cream-100);
+  --destructive: oklch(0.704 0.191 22);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: var(--forest-500);
+  --chart-1: oklch(0.56 0.115 157);
+  --chart-2: oklch(0.72 0.06 240);
+  --chart-3: oklch(0.78 0.12 80);
+  --chart-4: oklch(0.68 0.13 30);
+  --chart-5: oklch(0.49 0.105 158);
+  --sidebar: var(--navy-900);
+  --sidebar-foreground: var(--cream-100);
+  --sidebar-primary: var(--forest-500);
+  --sidebar-primary-foreground: var(--navy-950);
+  --sidebar-accent: var(--navy-800);
+  --sidebar-accent-foreground: var(--cream-100);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: var(--forest-500);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  ::selection {
+    @apply bg-forest-600/20 text-foreground;
+  }
+}
+
+@layer utilities {
+  /* Subtle blueprint grid used in dark hero sections */
+  .bg-grid-navy {
+    background-image:
+      linear-gradient(to right, oklch(1 0 0 / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(1 0 0 / 0.045) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+  .bg-grid-cream {
+    background-image:
+      linear-gradient(to right, oklch(0.2 0.03 250 / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(0.2 0.03 250 / 0.045) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+  .glass-dark {
+    background: oklch(1 0 0 / 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid oklch(1 0 0 / 0.09);
+  }
+  .glass-light {
+    background: oklch(1 0 0 / 0.72);
+    backdrop-filter: blur(10px);
+    border: 1px solid oklch(0.2 0.03 250 / 0.07);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Custom scrollbar for long lists */
+.scroll-slim::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-slim::-webkit-scrollbar-thumb {
+  background: oklch(0.78 0.03 240);
+  border-radius: 8px;
+}
+.scroll-slim::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.66 0.04 245);
+}

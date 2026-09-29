@@ -1,0 +1,731 @@
+     1→// PACKVEDA — Deterministic, explainable recommendation engine.
+     2→//
+     3→// Pipeline: user inputs → derived packaging requirements (food-science rules)
+     4→//   → hard-constraint filtering → multi-criteria scoring → explainable output.
+     5→//
+     6→// IMPORTANT DESIGN RULES
+     7→// - This engine is deterministic rule-based decision support. It does NOT call
+     8→//   any LLM and does NOT invent property values. All material properties come
+     9→//   from src/lib/data/materials.ts with provenance.
+    10→// - Scores are relative compatibility indicators for shortlisting candidates,
+    11→//   NOT guarantees of shelf life or regulatory compliance.
+    12→
+    13→import {
+    14→  COMMODITIES,
+    15→  Commodity,
+    16→  COMMODITY_CATEGORY_LABELS,
+    17→} from "./data/commodities";
+    18→import { MATERIALS, PackagingMaterial } from "./data/materials";
+    19→import { Intensity } from "./data/types";
+    20→
+    21→// ---------------------------------------------------------------------------
+    22→// Public types
+    23→// ---------------------------------------------------------------------------
+    24→
+    25→export type Importance = "none" | "low" | "medium" | "high";
+    26→
+    27→export interface AnalysisInput {
+    28→  commodityId: string;
+    29→  commodityName: string;
+    30→  foodCategory: string; // label string, e.g. "Spice / Masala"
+    31→  processing: "fresh" | "processed";
+    32→  moisturePercent: number;
+    33→  fatPercent: number;
+    34→  ph: number;
+    35→  waterActivity: number | null;
+    36→  respiration: Intensity;
+    37→  oxygenSensitivity: Intensity;
+    38→  aromaSensitivity: Intensity;
+    39→  lightSensitivity: Intensity;
+    40→  hygroscopic: boolean;
+    41→  fragile: boolean;
+    42→  targetShelfLifeDays: number;
+    43→  storageTempC: number;
+    44→  storageRH: number;
+    45→  storageType: "ambient" | "chilled" | "frozen" | "cold_chain";
+    46→  transportDurationDays: number;
+    47→  transportMode: "road" | "rail" | "sea" | "air" | "multimodal";
+    48→  handlingIntensity: "gentle" | "normal" | "rough";
+    49→  lightExposure: "none" | "partial" | "direct";
+    50→  priorities: {
+    51→    cost: Importance;
+    52→    sustainability: Importance;
+    53→    barrier: Importance;
+    54→    shelfLife: Importance;
+    55→    mechanical: Importance;
+    56→  };
+    57→}
+    58→
+    59→export type RequirementKey =
+    60→  | "moisture"
+    61→  | "oxygen"
+    62→  | "co2"
+    63→  | "light"
+    64→  | "aroma"
+    65→  | "mechanical"
+    66→  | "seal"
+    67→  | "thermal";
+    68→
+    69→export interface DerivedRequirement {
+    70→  key: RequirementKey;
+    71→  label: string;
+    72→  /** For barrier-style requirements: none/low/moderate/high/very_high; for oxygen 'exchange' means O2/CO2 exchange needed */
+    73→  level: Intensity | "exchange";
+    74→  unitNote?: string;
+    75→  rationale: string;
+    76→}
+    77→
+    78→export interface ScoreBreakdown {
+    79→  barrier: number; // 0..1
+    80→  shelfLife: number;
+    81→  mechanical: number;
+    82→  cost: number;
+    83→  sustainability: number;
+    84→  availability: number;
+    85→}
+    86→
+    87→export interface CandidateResult {
+    88→  materialId: string;
+    89→  materialName: string;
+    90→  score: number; // 0..100 overall compatibility (engine score)
+    91→  status: "recommended" | "viable" | "excluded";
+    92→  rank: number; // 1..N among non-excluded; excluded get -1
+    93→  breakdown: ScoreBreakdown;
+    94→  matches: string[]; // why it fits
+    95→  gaps: string[]; // why it scored lower / cautions
+    96→  exclusionReasons: string[]; // hard constraint failures
+    97→}
+    98→
+    99→export interface EngineOutput {
+   100→  requirements: DerivedRequirement[];
+   101→  candidates: CandidateResult[];
+   102→  recommended: CandidateResult | null;
+   103→  weights: Record<string, number>;
+   104→  engineMeta: {
+   105→    engineVersion: string;
+   106→    generatedAt: string;
+   107→    inputsSummary: Record<string, string>;
+   108→    filtersApplied: string[];
+   109→    disclaimer: string;
+   110→  };
+   111→}
+   112→
+   113→const ENGINE_VERSION = "packveda-rules-1.0.0";
+   114→export const ENGINE_DISCLAIMER =
+   115→  "PackVeda provides decision support based on food-science rules and indicative packaging property data. Scores are relative compatibility indicators for shortlisting. Laboratory testing and expert validation are required before commercial adoption.";
+   116→
+   117→// ---------------------------------------------------------------------------
+   118→// Helpers
+   119→// ---------------------------------------------------------------------------
+   120→
+   121→const LEVEL_ORDER: Record<Intensity, number> = {
+   122→  none: 0,
+   123→  low: 1,
+   124→  moderate: 2,
+   125→  high: 3,
+   126→  very_high: 4,
+   127→};
+   128→
+   129→const LEVEL_LABEL: Record<Intensity, string> = {
+   130→  none: "none",
+   131→  low: "low",
+   132→  moderate: "moderate",
+   133→  high: "high",
+   134→  very_high: "very high",
+   135→};
+   136→
+   137→function maxLevel(a: Intensity, b: Intensity): Intensity {
+   138→  return LEVEL_ORDER[a] >= LEVEL_ORDER[b] ? a : b;
+   139→}
+   140→
+   141→function bumpLevel(level: Intensity, steps: number): Intensity {
+   142→  const idx = Math.min(4, Math.max(0, LEVEL_ORDER[level] + steps));
+   143→  return (Object.keys(LEVEL_ORDER) as Intensity[]).find(
+   144→    (k) => LEVEL_ORDER[k] === idx
+   145→  ) as Intensity;
+   146→}
+   147→
+   148→/** Max permitted transmission rate by required barrier level. */
+   149→function otrThreshold(level: Intensity): number {
+   150→  switch (level) {
+   151→    case "very_high":
+   152→      return 2;
+   153→    case "high":
+   154→      return 20;
+   155→    case "moderate":
+   156→      return 100;
+   157→    case "low":
+   158→      return 1500;
+   159→    default:
+   160→      return Infinity;
+   161→  }
+   162→}
+   163→
+   164→function wvtrThreshold(level: Intensity): number {
+   165→  switch (level) {
+   166→    case "very_high":
+   167→      return 1.5;
+   168→    case "high":
+   169→      return 3;
+   170→    case "moderate":
+   171→      return 10;
+   172→    case "low":
+   173→      return 25;
+   174→    default:
+   175→      return Infinity;
+   176→  }
+   177→}
+   178→
+   179→function tensileThreshold(level: Intensity): number {
+   180→  switch (level) {
+   181→    case "very_high":
+   182→      return 100;
+   183→    case "high":
+   184→      return 50;
+   185→    case "moderate":
+   186→      return 25;
+   187→    case "low":
+   188→      return 10;
+   189→    default:
+   190→      return 0;
+   191→  }
+   192→}
+   193→
+   194→/**
+   195→ * Fit score for a "lower transmission is better" property.
+   196→ * ratio = permitted threshold / actual transmission.
+   197→ */
+   198→function transmissionFit(actual: number | null, threshold: number): number {
+   199→  if (actual === null) return 0; // cannot verify => no credit, flagged in gaps
+   200→  if (threshold === Infinity) return 0.75; // no requirement: neutral credit
+   201→  const ratio = threshold / Math.max(actual, 1e-6);
+   202→  if (ratio >= 1) return Math.min(1, 0.78 + 0.22 * Math.min(1, ratio / 10));
+   203→  return Math.max(0, ratio * 0.75); // partial credit below threshold
+   204→}
+   205→
+   206→/** Fit score for rank-based capabilities (aroma, light, seal, puncture). */
+   207→function capabilityFit(actual: Intensity, required: Intensity): number {
+   208→  if (required === "none") return 0.75;
+   209→  const ratio = LEVEL_ORDER[actual] / Math.max(1, LEVEL_ORDER[required]);
+   210→  if (ratio >= 1) return 1;
+   211→  return Math.max(0, ratio * 0.7);
+   212→}
+   213→
+   214→function fmtNum(n: number): string {
+   215→  if (n >= 100) return n.toFixed(0);
+   216→  if (n >= 1) return n.toFixed(1);
+   217→  return n.toFixed(2);
+   218→}
+   219→
+   220→// ---------------------------------------------------------------------------
+   221→// Requirement derivation (food-science rules)
+   222→// ---------------------------------------------------------------------------
+   223→
+   224→export function deriveRequirements(
+   225→  input: AnalysisInput,
+   226→  commodity: Commodity | null
+   227→): DerivedRequirement[] {
+   228→  const req: DerivedRequirement[] = [];
+   229→  const shelf = input.targetShelfLifeDays;
+   230→  const longShelf = shelf >= 180;
+   231→  const veryLongShelf = shelf >= 270;
+   232→
+   233→  // ---- Moisture barrier ----
+   234→  let moisture: Intensity = "moderate";
+   235→  let moistureWhy = "";
+   236→  if (input.respiration === "high" || input.respiration === "very_high") {
+   237→    moisture = "low";
+   238→    moistureWhy =
+   239→      "Fresh, respiring produce needs breathable packaging; only a low moisture-tightness requirement is set to limit condensation and drying.";
+   240→  } else if (input.storageType === "frozen" || input.storageTempC <= 0) {
+   241→    moisture = "high";
+   242→    moistureWhy =
+   243→      "Frozen storage: sublimation inside the pack causes freezer burn, so a high moisture barrier and strong seals are required.";
+   244→  } else if (input.processing === "processed" && input.moisturePercent <= 5) {
+   245→    moisture = "very_high";
+   246→    moistureWhy = `Very low moisture content (${input.moisturePercent}%): even small moisture pickup changes texture/stability, so a very high moisture barrier is required.`;
+   247→  } else if (input.processing === "processed" && input.moisturePercent <= 15) {
+   248→    moisture = "high";
+   249→    moistureWhy = `Low-moisture processed food (${input.moisturePercent}% moisture${input.hygroscopic ? ", hygroscopic" : ""}): strong moisture barrier needed to prevent caking, mould and quality loss.`;
+   250→  } else if (input.moisturePercent <= 40) {
+   251→    moisture = "moderate";
+   252→    moistureWhy = `Intermediate-moisture food (${input.moisturePercent}%): a moderate moisture barrier helps balance drying and condensation.`;
+   253→  } else {
+   254→    moisture = "low";
+   255→    moistureWhy =
+   256→      "High-moisture food; primary concerns are gas exchange/condensation rather than absolute moisture-tightness.";
+   257→  }
+   258→  if (input.storageRH >= 75 && moisture !== "low") {
+   259→    moisture = bumpLevel(moisture, 1);
+   260→    moistureWhy += ` High storage RH (${input.storageRH}%) increases moisture uptake risk — requirement raised one level.`;
+   261→  }
+   262→  if (veryLongShelf && moisture !== "very_high" && moisture !== "low") {
+   263→    moisture = bumpLevel(moisture, 1);
+   264→    moistureWhy += ` Long shelf-life target (${shelf} days) — requirement raised one level.`;
+   265→  }
+   266→  req.push({
+   267→    key: "moisture",
+   268→    label: "Moisture barrier",
+   269→    level: moisture,
+   270→    unitNote: "max WVTR: see level mapping",
+   271→    rationale: moistureWhy,
+   272→  });
+   273→
+   274→  // ---- Oxygen ----
+   275→  let oxygen: Intensity;
+   276→  let oxygenWhy: string;
+   277→  if (input.respiration === "high" || input.respiration === "very_high") {
+   278→    oxygen = "exchange";
+   279→    oxygenWhy = `Respiring produce (respiration: ${input.respiration.replace("_", " ")}) consumes O₂ and releases CO₂. Packaging must allow gas exchange; high-barrier materials are excluded unless engineered for MAP.`;
+   280→  } else if (input.fatPercent >= 30) {
+   281→    oxygen = "very_high";
+   282→    oxygenWhy = `Very high fat content (${input.fatPercent}%): oxidation/rancidity is the dominant spoilage route — very high oxygen barrier required${input.oxygenSensitivity !== "none" ? `, consistent with the commodity's ${input.oxygenSensitivity.replace("_", " ")} oxygen sensitivity` : ""}.`;
+   283→  } else if (input.fatPercent >= 8) {
+   284→    oxygen = "high";
+   285→    oxygenWhy = `Significant fat content (${input.fatPercent}%): strong oxygen barrier needed to slow oxidative rancidity.`;
+   286→  } else if (input.fatPercent >= 3) {
+   287→    oxygen = "moderate";
+   288→    oxygenWhy = `Moderate fat content (${input.fatPercent}%): a moderate oxygen barrier is advisable.`;
+   289→  } else {
+   290→    oxygen = input.oxygenSensitivity === "none" ? "low" : "low";
+   291→    oxygenWhy =
+   292→      "Low fat content; oxygen barrier requirement is modest and driven mainly by the commodity sensitivity profile.";
+   293→  }
+   294→  const sensOxy = LEVEL_ORDER[input.oxygenSensitivity];
+   295→  if (oxygen !== "exchange" && sensOxy >= LEVEL_ORDER.high && LEVEL_ORDER[oxygen] < sensOxy - 1) {
+   296→    oxygen = bumpLevel(oxygen, sensOxy - 1 - LEVEL_ORDER[oxygen]);
+   297→    oxygenWhy += ` Commodity marked ${input.oxygenSensitivity.replace("_", " ")} oxygen sensitive — requirement aligned.`;
+   298→  }
+   299→  if (oxygen !== "exchange" && longShelf && LEVEL_ORDER[oxygen] < 3) {
+   300→    oxygen = bumpLevel(oxygen, 1);
+   301→    oxygenWhy += ` Long shelf-life target (${shelf} days) raises oxygen-barrier need.`;
+   302→  }
+   303→  req.push({
+   304→    key: "oxygen",
+   305→    label: "Oxygen barrier",
+   306→    level: oxygen,
+   307→    unitNote: "max OTR: see level mapping",
+   308→    rationale: oxygenWhy,
+   309→  });
+   310→
+   311→  // ---- CO2 management ----
+   312→  if (input.respiration !== "none" && LEVEL_ORDER[input.respiration] >= 2) {
+   313→    req.push({
+   314→      key: "co2",
+   315→      label: "CO₂ management",
+   316→      level: "exchange",
+   317→      rationale: `Respiration releases CO₂. Accumulated CO₂ can damage produce; consider breathable films or MAP trials matched to the respiration rate.`,
+   318→    });
+   319→  }
+   320→
+   321→  // ---- Light protection ----
+   322→  let light: Intensity = input.lightSensitivity;
+   323→  let lightWhy =
+   324→    input.lightSensitivity === "none"
+   325→      ? "Commodity is not strongly light sensitive."
+   326→      : `Commodity light sensitivity: ${input.lightSensitivity.replace("_", " ")}.`;
+   327→  if (input.lightExposure === "direct" && LEVEL_ORDER[light] < 3) {
+   328→    light = bumpLevel(light, 1);
+   329→    lightWhy += " Direct light exposure during transport/storage raises the requirement.";
+   330→  } else if (input.lightExposure === "partial" && LEVEL_ORDER[light] < 2) {
+   331→    light = bumpLevel(light, 1);
+   332→    lightWhy += " Partial light exposure raises the requirement.";
+   333→  }
+   334→  if (input.fatPercent >= 20 && LEVEL_ORDER[light] < 2) {
+   335→    light = bumpLevel(light, 1);
+   336→    lightWhy += ` High fat content (${input.fatPercent}%) is vulnerable to light-induced oxidation.`;
+   337→  }
+   338→  req.push({
+   339→    key: "light",
+   340→    label: "Light protection",
+   341→    level: light,
+   342→    rationale: lightWhy,
+   343→  });
+   344→
+   345→  // ---- Aroma ----
+   346→  const aroma = input.aromaSensitivity;
+   347→  req.push({
+   348→    key: "aroma",
+   349→    label: "Aroma protection",
+   350→    level: aroma,
+   351→    rationale:
+   352→      aroma === "none" || aroma === "low"
+   353→        ? "Aroma retention is not a primary driver for this commodity."
+   354→        : `Commodity aroma sensitivity: ${aroma.replace("_", " ")} — packaging should retain desirable aromas and block foreign odours.`,
+   355→  });
+   356→
+   357→  // ---- Mechanical ----
+   358→  let mech: Intensity = input.fragile ? "high" : "moderate";
+   359→  let mechWhy = input.fragile
+   360→    ? "Fragile product: packaging must protect against crushing and impact."
+   361→    : "Baseline mechanical protection for normal distribution.";
+   362→  if (input.handlingIntensity === "rough") {
+   363→    mech = bumpLevel(mech, 1);
+   364→    mechWhy += " Rough handling expected — requirement raised.";
+   365→  }
+   366→  if (input.transportDurationDays >= 7) {
+   367→    mech = bumpLevel(mech, 1);
+   368→    mechWhy += ` Long transit (${input.transportDurationDays} days) adds handling cycles — requirement raised.`;
+   369→  }
+   370→  if (input.transportMode === "sea" || input.transportMode === "multimodal") {
+   371→    mech = bumpLevel(mech, 1);
+   372→    mechWhy += " Sea/multimodal transport involves stacking and humidity swings — requirement raised.";
+   373→  }
+   374→  if (mech === "low") mech = "low";
+   375→  req.push({
+   376→    key: "mechanical",
+   377→    label: "Mechanical strength",
+   378→    level: mech,
+   379→    rationale: mechWhy,
+   380→  });
+   381→
+   382→  // ---- Sealability ----
+   383→  let seal: Intensity = "moderate";
+   384→  let sealWhy = "Standard seal integrity for distribution.";
+   385→  if (
+   386→    input.hygroscopic ||
+   387→    input.moisturePercent <= 15 ||
+   388→    input.storageType === "frozen" ||
+   389→    longShelf
+   390→  ) {
+   391→    seal = "high";
+   392→    sealWhy =
+   393→      "Low-moisture/hygroscopic food, frozen storage or long shelf life: high seal integrity is important to keep the barrier effective.";
+   394→  }
+   395→  if (input.processing === "processed" && input.moisturePercent <= 5) {
+   396→    seal = "very_high";
+   397→    sealWhy = "Very dry product: hermetic sealing is essential to protect the moisture barrier function.";
+   398→  }
+   399→  req.push({
+   400→    key: "seal",
+   401→    label: "Sealability",
+   402→    level: seal,
+   403→    rationale: sealWhy,
+   404→  });
+   405→
+   406→  // ---- Thermal suitability ----
+   407→  let thermalWhy: string;
+   408→  const thermalLevel: Intensity =
+   409→    input.storageType === "frozen" || input.storageTempC <= 0
+   410→      ? "high"
+   411→      : input.storageType === "chilled" || input.storageType === "cold_chain"
+   412→        ? "moderate"
+   413→        : "low";
+   414→  thermalWhy = `Storage at ${input.storageTempC} °C (${input.storageType.replace("_", " ")}): material must remain functional across this range${
+   415→    input.transportDurationDays >= 7 ? ` and during ${input.transportDurationDays}-day transit` : ""
+   416→  }.`;
+   417→  if (commodity?.chillingSensitive && input.storageTempC < (commodity.minSafeStorageTempC ?? -Infinity)) {
+   418→    thermalWhy += ` Note: ${commodity.name} is chilling sensitive — consider raising storage temperature above ~${commodity.minSafeStorageTempC} °C (packaging cannot prevent chilling injury).`;
+   419→  }
+   420→  req.push({
+   421→    key: "thermal",
+   422→    label: "Temperature suitability",
+   423→    level: thermalLevel,
+   424→    rationale: thermalWhy,
+   425→  });
+   426→
+   427→  return req;
+   428→}
+   429→
+   430→// ---------------------------------------------------------------------------
+   431→// Constraint filtering + scoring
+   432→// ---------------------------------------------------------------------------
+   433→
+   434→function materialPassesBreathability(m: PackagingMaterial): boolean {
+   435→  // For respiring produce, exclude high-barrier materials (OTR ≤ 100)
+   436→  return m.otr === null || m.otr > 100;
+   437→}
+   438→
+   439→function temperatureReasons(
+   440→  m: PackagingMaterial,
+   441→  input: AnalysisInput
+   442→): string[] {
+   443→  const reasons: string[] = [];
+   444→  if (m.tempMinC !== null && input.storageTempC < m.tempMinC) {
+   445→    reasons.push(
+   446→      `Service temperature range does not cover storage at ${input.storageTempC} °C (indicative min ${m.tempMinC} °C).`
+   447→    );
+   448→  }
+   449→  return reasons;
+   450→}
+   451→
+   452→function computeWeights(input: AnalysisInput): Record<string, number> {
+   453→  const p = input.priorities;
+   454→  const raw = {
+   455→    barrier:
+   456→      p.barrier === "none" ? 0.4 : p.barrier === "low" ? 1 : p.barrier === "medium" ? 2 : 3,
+   457→    shelfLife:
+   458→      p.shelfLife === "none" ? 0.4 : p.shelfLife === "low" ? 1 : p.shelfLife === "medium" ? 2 : 3,
+   459→    mechanical:
+   460→      p.mechanical === "none" ? 0.4 : p.mechanical === "low" ? 1 : p.mechanical === "medium" ? 2 : 3,
+   461→    cost: p.cost === "none" ? 0.4 : p.cost === "low" ? 1 : p.cost === "medium" ? 2 : 3,
+   462→    sustainability:
+   463→      p.sustainability === "none"
+   464→        ? 0.4
+   465→        : p.sustainability === "low"
+   466→          ? 1
+   467→          : p.sustainability === "medium"
+   468→            ? 2
+   469→            : 3,
+   470→  };
+   471→  const total = Object.values(raw).reduce((a, b) => a + b, 0);
+   472→  const weights: Record<string, number> = {};
+   473→  for (const [k, v] of Object.entries(raw)) weights[k] = v / total;
+   474→  return weights;
+   475→}
+   476→
+   477→export function runEngine(input: AnalysisInput): EngineOutput {
+   478→  const commodity = COMMODITIES.find((c) => c.id === input.commodityId) ?? null;
+   479→  const requirements = deriveRequirements(input, commodity);
+   480→  const get = (k: RequirementKey) =>
+   481→    requirements.find((r) => r.key === k)! as DerivedRequirement;
+   482→  const moistureReq = get("moisture");
+   483→  const oxygenReq = get("oxygen");
+   484→  const lightReq = get("light");
+   485→  const aromaReq = get("aroma");
+   486→  const mechReq = get("mechanical");
+   487→  const sealReq = get("seal");
+   488→  const weights = computeWeights(input);
+   489→  const filtersApplied: string[] = [];
+   490→
+   491→  const candidates: CandidateResult[] = MATERIALS.map((m) => {
+   492→    const matches: string[] = [];
+   493→    const gaps: string[] = [];
+   494→    const exclusionReasons: string[] = [];
+   495→
+   496→    // ---- Hard constraints ----
+   497→    if (!m.foodContactSuitable) {
+   498→      exclusionReasons.push("Food-contact suitability not established for this material class.");
+   499→    }
+   500→    exclusionReasons.push(...temperatureReasons(m, input));
+   501→    if (oxygenReq.level === "exchange" && !materialPassesBreathability(m)) {
+   502→      exclusionReasons.push(
+   503→        "Product requires O₂/CO₂ exchange (respiring produce) — high-barrier material excluded from primary-pack candidates."
+   504→      );
+   505→    }
+   506→
+   507→    // ---- Fits ----
+   508→    const wvtrFit = transmissionFit(m.wvtr, wvtrThreshold(moistureReq.level as Intensity));
+   509→    const otrFit =
+   510→      oxygenReq.level === "exchange"
+   511→        ? 1 // breathable materials get full credit; non-breathable excluded above
+   512→        : transmissionFit(m.otr, otrThreshold(oxygenReq.level as Intensity));
+   513→    const lightFit = capabilityFit(m.lightBlocking, lightReq.level as Intensity);
+   514→    const aromaFit = capabilityFit(m.aromaBarrier, aromaReq.level as Intensity);
+   515→    const tensileFit = transmissionFit(
+   516→      m.tensileStrengthMPa === null ? null : m.tensileStrengthMPa,
+   517→      tensileThreshold(mechReq.level as Intensity)
+   518→    );
+   519→    const mechFit = Math.max(
+   520→      tensileFit,
+   521→      capabilityFit(m.punctureResistance, mechReq.level as Intensity)
+   522→    );
+   523→    const sealFit = capabilityFit(m.sealability, sealReq.level as Intensity);
+   524→
+   525→    const tempOk =
+   526→      m.tempMinC === null || input.storageTempC >= m.tempMinC;
+   527→    const tempMargin = tempOk
+   528→      ? 1
+   529→      : 0;
+   530→
+   531→    const barrierAvg = (wvtrFit + otrFit + lightFit + aromaFit) / 4;
+   532→    const shelfFit = (barrierAvg + sealFit) / 2;
+   533→    const costScore = (6 - m.relativeCostIndex) / 5;
+   534→    const sustainScore = m.sustainability.score;
+   535→    const availabilityScore = capabilityFit(m.availability, "moderate");
+   536→
+   537→    const breakdown: ScoreBreakdown = {
+   538→      barrier: barrierAvg,
+   539→      shelfLife: shelfFit,
+   540→      mechanical: mechFit,
+   541→      cost: costScore,
+   542→      sustainability: sustainScore,
+   543→      availability: availabilityScore,
+   544→    };
+   545→
+   546→    const weighted =
+   547→      weights.barrier * barrierAvg +
+   548→      weights.shelfLife * shelfFit +
+   549→      weights.mechanical * mechFit +
+   550→      weights.cost * costScore +
+   551→      weights.sustainability * sustainScore;
+   552→    const wSum =
+   553→      weights.barrier +
+   554→      weights.shelfLife +
+   555→      weights.mechanical +
+   556→      weights.cost +
+   557→      weights.sustainability;
+   558→    let score = (weighted / wSum) * 100;
+   559→    score *= 0.9 + 0.1 * availabilityScore;
+   560→    score *= tempOk ? 1 : 0.5; // temperature mismatch drags score if not excluded
+   561→    const finalScore = Math.round(Math.max(0, Math.min(100, score)) * 10) / 10;
+   562→
+   563→    // ---- Matches (why it fits) ----
+   564→    if (moistureReq.level !== "none") {
+   565→      if (m.wvtr !== null && m.wvtr <= wvtrThreshold(moistureReq.level as Intensity)) {
+   566→        matches.push(
+   567→          `Meets ${LEVEL_LABEL[moistureReq.level as Intensity]} moisture-protection requirement (WVTR ≈ ${fmtNum(m.wvtr)} g/m²/day vs required ≤ ${fmtNum(wvtrThreshold(moistureReq.level as Intensity))}).`
+   568→        );
+   569→      } else if (moistureReq.level === "low") {
+   570→        matches.push("Adequate for the low moisture-tightness requirement of this product.");
+   571→      } else {
+   572→        gaps.push(
+   573→          m.wvtr === null
+   574→            ? "Moisture barrier data not available — cannot verify against requirement."
+   575→            : `Moisture barrier likely insufficient: WVTR ≈ ${fmtNum(m.wvtr)} g/m²/day vs required ≤ ${fmtNum(wvtrThreshold(moistureReq.level as Intensity))}.`
+   576→        );
+   577→      }
+   578→    }
+   579→    if (oxygenReq.level === "exchange") {
+   580→      matches.push("Permits O₂/CO₂ exchange needed by respiring produce (verify with MAP trials).");
+   581→    } else if (oxygenReq.level !== "none") {
+   582→      if (m.otr !== null && m.otr <= otrThreshold(oxygenReq.level as Intensity)) {
+   583→        matches.push(
+   584→          `Meets ${LEVEL_LABEL[oxygenReq.level as Intensity]} oxygen-barrier requirement (OTR ≈ ${fmtNum(m.otr)} cc/m²/day vs required ≤ ${fmtNum(otrThreshold(oxygenReq.level as Intensity))}).`
+   585→        );
+   586→      } else if (oxygenReq.level === "low") {
+   587→        matches.push("Adequate for the low oxygen-barrier requirement of this product.");
+   588→      } else {
+   589→        gaps.push(
+   590→          m.otr === null
+   591→            ? "Oxygen barrier data not available — cannot verify against requirement."
+   592→            : `Oxygen barrier below requirement: OTR ≈ ${fmtNum(m.otr)} cc/m²/day vs required ≤ ${fmtNum(otrThreshold(oxygenReq.level as Intensity))}.`
+   593→        );
+   594→      }
+   595→    }
+   596→    if ((lightReq.level as Intensity) !== "none" && LEVEL_ORDER[m.lightBlocking] >= LEVEL_ORDER[lightReq.level as Intensity]) {
+   597→      matches.push(
+   598→        `Provides ${LEVEL_LABEL[m.lightBlocking]} light protection (required: ${LEVEL_LABEL[lightReq.level as Intensity]}).`
+   599→      );
+   600→    } else if ((lightReq.level as Intensity) !== "none") {
+   601→      gaps.push(
+   602→        `Light protection limited: ${LEVEL_LABEL[m.lightBlocking]} vs required ${LEVEL_LABEL[lightReq.level as Intensity]}.`
+   603→      );
+   604→    }
+   605→    if ((aromaReq.level as Intensity) !== "none" && LEVEL_ORDER[m.aromaBarrier] >= LEVEL_ORDER[aromaReq.level as Intensity]) {
+   606→      matches.push(`Aroma barrier compatible with commodity sensitivity (${LEVEL_LABEL[aromaReq.level as Intensity]}).`);
+   607→    } else if (LEVEL_ORDER[aromaReq.level as Intensity] >= 3) {
+   608→      gaps.push(
+   609→        `Aroma barrier limited (${LEVEL_LABEL[m.aromaBarrier]}) for a highly aroma-sensitive product.`
+   610→      );
+   611→    }
+   612→    if (tempOk && input.storageTempC < 5) {
+   613→      matches.push(
+   614→        `Service range covers frozen/chilled storage at ${input.storageTempC} °C (indicative min ${m.tempMinC} °C).`
+   615→      );
+   616→    } else if (tempOk && input.storageTempC >= 5) {
+   617→      matches.push(
+   618→        `Compatible with storage at ${input.storageTempC} °C (service range ${m.tempMinC}–${m.tempMaxC} °C).`
+   619→      );
+   620→    }
+   621→    if (LEVEL_ORDER[m.sealability] >= LEVEL_ORDER[sealReq.level as Intensity]) {
+   622→      matches.push(`Sealability meets the ${LEVEL_LABEL[sealReq.level as Intensity]} seal-integrity requirement.`);
+   623→    } else {
+   624→      gaps.push(`Sealability below the ${LEVEL_LABEL[sealReq.level as Intensity]} requirement — seal design will need attention.`);
+   625→    }
+   626→    if (shelfFit >= 0.8) {
+   627→      matches.push(
+   628→        `Barrier profile consistent with the ${input.targetShelfLifeDays}-day shelf-life target (engine estimate).`
+   629→      );
+   630→    } else if (shelfFit < 0.6) {
+   631→      gaps.push(
+   632→        `Barrier profile may not support the ${input.targetShelfLifeDays}-day shelf-life target without further measures (e.g. MAP, secondary packaging).`
+   633→      );
+   634→    }
+   635→
+   636→    // ---- Business-factor gaps ----
+   637→    if (m.relativeCostIndex >= 4 && input.priorities.cost !== "none") {
+   638→      gaps.push("Higher estimated relative cost — evaluate whether the added barrier is necessary.");
+   639→    }
+   640→    if (m.sustainability.score <= 0.3 && input.priorities.sustainability !== "none") {
+   641→      gaps.push("Lower sustainability profile; recycling is difficult for this structure.");
+   642→    }
+   643→    if (m.sustainability.score >= 0.55 && input.priorities.sustainability !== "none") {
+   644→      matches.push("Aligns with sustainability priority (recyclable/compostable material class).");
+   645→    }
+   646→    if (input.priorities.cost !== "none" && m.relativeCostIndex <= 1) {
+   647→      matches.push("Low-cost material class — efficient for cost-sensitive applications.");
+   648→    }
+   649→    if (m.sustainability.score >= 0.55 && input.priorities.sustainability === "none") {
+   650→      gaps.push("Sustainability profile is favourable even though sustainability was not prioritised.");
+   651→    }
+   652→
+   653→    // Temperature note for produce chilling sensitivity
+   654→    if (commodity?.chillingSensitive && input.storageTempC < (commodity.minSafeStorageTempC ?? -Infinity)) {
+   655→      gaps.push(
+   656→        "Storage temperature is below the commodity's safe range — packaging cannot prevent chilling injury; adjust storage temperature."
+   657→      );
+   658→    }
+   659→
+   660→    return {
+   661→      materialId: m.id,
+   662→      materialName: m.name,
+   663→      score: finalScore,
+   664→      status: exclusionReasons.length > 0 ? "excluded" : "viable",
+   665→      rank: -1,
+   666→      breakdown,
+   667→      matches,
+   668→      gaps,
+   669→      exclusionReasons,
+   670→    };
+   671→  });
+   672→
+   673→  filtersApplied.push(
+   674→    "Food-contact suitability (material class)",
+   675→    `Storage temperature coverage (${input.storageTempC} °C)`
+   676→  );
+   677→  if (oxygenReq.level === "exchange") {
+   678→    filtersApplied.push("Breathability for respiring produce (OTR > 100 cc/m²/day)");
+   679→  }
+   680→
+   681→  const viable = candidates.filter((c) => c.status !== "excluded");
+   682→  viable.sort((a, b) => b.score - a.score);
+   683→  viable.forEach((c, i) => (c.rank = i + 1));
+   684→  if (viable.length > 0) viable[0].status = "recommended";
+   685→
+   686→  const excluded = candidates.filter((c) => c.status === "excluded");
+   687→
+   688→  const inputsSummary: Record<string, string> = {
+   689→    Commodity: input.commodityName,
+   690→    Category: input.foodCategory,
+   691→    Processing: input.processing,
+   692→    "Moisture / Fat / pH": `${input.moisturePercent}% / ${input.fatPercent}% / ${input.ph}`,
+   693→    "Water activity": input.waterActivity !== null ? String(input.waterActivity) : "Data not available",
+   694→    "Target shelf life": `${input.targetShelfLifeDays} days`,
+   695→    Storage: `${input.storageTempC} °C, ${input.storageRH}% RH (${input.storageType.replace("_", " ")})`,
+   696→    Transport: `${input.transportMode}, ${input.transportDurationDays} day(s), ${input.handlingIntensity} handling`,
+   697→    "Light exposure": input.lightExposure,
+   698→  };
+   699→
+   700→  return {
+   701→    requirements,
+   702→    candidates: [...viable, ...excluded],
+   703→    recommended: viable[0] ?? null,
+   704→    weights,
+   705→    engineMeta: {
+   706→      engineVersion: ENGINE_VERSION,
+   707→      generatedAt: new Date().toISOString(),
+   708→      inputsSummary,
+   709→      filtersApplied,
+   710→      disclaimer: ENGINE_DISCLAIMER,
+   711→    },
+   712→  };
+   713→}
+   714→
+   715→// ---------------------------------------------------------------------------
+   716→// "Why not selected" helper for a specific material vs the recommended one
+   717→// ---------------------------------------------------------------------------
+   718→
+   719→export function compareCandidateToTop(
+   720→  candidate: CandidateResult,
+   721→  top: CandidateResult
+   722→): string[] {
+   723→  const notes: string[] = [];
+   724→  if (candidate.status === "excluded") return candidate.exclusionReasons;
+   725→  if (candidate.score < top.score) {
+   726→    const delta = Math.round((top.score - candidate.score) * 10) / 10;
+   727→    notes.push(`Overall compatibility ${delta} points lower than the top-ranked candidate.`);
+   728→  }
+   729→  return [...notes, ...candidate.gaps];
+   730→}
+   731→
