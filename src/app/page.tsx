@@ -1,4 +1,6 @@
+export const dynamic = 'force-dynamic';
 "use client";
+
 
 import { useEffect } from "react";
 import dynamic from "next/dynamic";
