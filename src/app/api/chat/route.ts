@@ -213,3 +213,22 @@ export async function POST(req: Request) {
     );
   }
 }
+import { createClient } from '@/lib/supabase/server';
+import { NextResponse } from 'next/server';
+
+export async function POST(req: Request) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+
+    if (error || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Process save candidate logic here...
+    
+  } catch (err) {
+    console.error('Save error:', err);
+    return NextResponse.json({ error: 'Failed to save candidate' }, { status: 500 });
+  }
+}
